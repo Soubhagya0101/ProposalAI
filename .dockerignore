@@ -1,0 +1,10 @@
+.env
+.env.*
+.git
+.netlify
+node_modules
+revenue_ops_data
+__pycache__
+*.pyc
+*.pyo
+*.log

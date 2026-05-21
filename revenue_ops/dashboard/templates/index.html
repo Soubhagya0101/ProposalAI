@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>ProposalAI Revenue Ops</title>
+    <link rel="stylesheet" href="/static/dashboard.css">
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Agent Dashboard</p>
+          <h1>ProposalAI revenue ops</h1>
+        </div>
+        <div class="status-line">
+          <span id="source">Loading store...</span>
+          <button id="refresh" type="button" title="Refresh now">Refresh</button>
+        </div>
+      </header>
+
+      <section class="metrics" aria-label="Revenue metrics">
+        <article><span>Leads found</span><strong id="leadsFound">0</strong></article>
+        <article><span>Messages ready</span><strong id="messagesReady">0</strong></article>
+        <article><span>Messages sent</span><strong id="messagesSent">0</strong></article>
+        <article><span>Emails today</span><strong id="emailsToday">0 / 40</strong></article>
+        <article><span>Replies</span><strong id="replies">0</strong></article>
+        <article><span>Hot leads</span><strong id="hotCount">0</strong></article>
+        <article><span>Free users</span><strong id="freeUsers">0</strong></article>
+        <article><span>Paying users</span><strong id="payingUsers">0</strong></article>
+      </section>
+
+      <section class="rates" aria-label="Conversion rates">
+        <div>
+          <span>Lead reply rate</span>
+          <strong id="leadReplyRate">0%</strong>
+          <div class="bar"><i id="leadReplyBar"></i></div>
+        </div>
+        <div>
+          <span>Free to paid</span>
+          <strong id="freeToPaidRate">0%</strong>
+          <div class="bar"><i id="freeToPaidBar"></i></div>
+        </div>
+        <div>
+          <span>Email reply rate</span>
+          <strong id="replyRate">0%</strong>
+          <div class="bar"><i id="replyRateBar"></i></div>
+        </div>
+        <div>
+          <span>Open rate</span>
+          <strong id="openRate">N/A</strong>
+          <div class="bar"><i id="openRateBar"></i></div>
+        </div>
+        <div>
+          <span>Follow-ups scheduled</span>
+          <strong id="followupsScheduled">0</strong>
+          <div class="bar"><i id="followupsBar"></i></div>
+        </div>
+        <div>
+          <span>Lead to paid</span>
+          <strong id="leadToPaidRate">0%</strong>
+          <div class="bar"><i id="leadToPaidBar"></i></div>
+        </div>
+      </section>
+
+      <section class="grid">
+        <div class="panel span-two">
+          <div class="panel-head">
+            <h2>Recent activity</h2>
+            <span id="lastUpdated">Waiting for refresh</span>
+          </div>
+          <ol id="activity" class="activity"></ol>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head">
+            <h2>Hot leads</h2>
+          </div>
+          <ol id="hotLeads" class="lead-list"></ol>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head">
+            <h2>Next follow-ups</h2>
+          </div>
+          <ol id="followups" class="followups"></ol>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head">
+            <h2>Scheduled runs</h2>
+          </div>
+          <ol id="scheduledRuns" class="followups"></ol>
+        </div>
+      </section>
+    </main>
+
+    <script src="/static/dashboard.js"></script>
+  </body>
+</html>

@@ -1,0 +1,52 @@
+# ProposalAI
+
+ProposalAI is a single-page freelancer proposal generator that uses GitHub Models (`openai/gpt-4o`) through a Netlify Function.
+
+## How it works
+
+1. Save a freelancer profile in the browser.
+2. Paste a job description.
+3. Generate a 300-400 word proposal in the selected tone.
+
+The GitHub Models token is stored as a Netlify environment variable named `GITHUB_MODELS_TOKEN`. The browser never shows or stores the token.
+
+## Revenue Ops
+
+The revenue system lives in `revenue_ops/`.
+
+Run the founder command:
+
+```powershell
+.\run_revenue_ops.bat
+```
+
+It initializes tracking, runs the daily agent cycle, and opens the live local dashboard at `http://127.0.0.1:8765`.
+
+The Google Sheets dashboard template is:
+https://docs.google.com/spreadsheets/d/1m2syNh-oDujGYPVo-Fd3-ZFPJFy6wJmruH9moKYA-88
+
+Latest live-data snapshot:
+https://docs.google.com/spreadsheets/d/1CGfj6k3idqc8k8OZB1r-natQu2cM6X0IkKrrrs2JYsU
+
+Full email automation is configured through `.env`:
+
+```powershell
+copy .env.example .env
+.\install_email_automation_tasks.ps1
+```
+
+The automation uses Hunter, Reddit public JSON, CSV imports, Brevo SMTP/API fallback, Brevo webhooks/inbound parse for reply tracking, and the existing dashboard/store.
+
+Google Sheets continuous sync requires a service-account JSON path in `GOOGLE_APPLICATION_CREDENTIALS`. Until that is added, the system writes live data to `revenue_ops_data/*.csv` and can export/upload snapshots.
+
+## Reliable Cloud Worker
+
+For real automation, run the revenue ops worker on a small Ubuntu VPS with a fixed IPv4. See `CLOUD_DEPLOY.md`.
+
+For a no-paid Render deployment, use the Render blueprint in `render.yaml` and follow `RENDER_DEPLOY.md`.
+
+Cloud services included:
+
+- `scheduler`: always-on daily lead finder, sender, follow-ups, retries, and summary
+- `webhook`: Brevo inbound/event receiver
+- `dashboard`: local-only dashboard, viewed through an SSH tunnel

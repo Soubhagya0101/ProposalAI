@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ProposalAI</title>
+  <link rel="icon" href="data:," />
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --surface: #ffffff;
+      --text: #111827;
+      --muted: #64748b;
+      --line: #dbe3ef;
+      --soft: #f1f6ff;
+      --blue: #2563eb;
+      --blue-dark: #1d4ed8;
+      --danger: #b42318;
+      --success: #067647;
+      --shadow: 0 22px 55px rgba(15, 23, 42, 0.08);
+      --radius: 8px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.5;
+    }
+
+    button,
+    input,
+    textarea,
+    select {
+      font: inherit;
+    }
+
+    button {
+      border: 0;
+      cursor: pointer;
+    }
+
+    .page {
+      width: min(960px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 28px 0 48px;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 28px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .mark {
+      width: 40px;
+      height: 40px;
+      display: grid;
+      place-items: center;
+      border-radius: var(--radius);
+      background: var(--blue);
+      color: #ffffff;
+      font-weight: 800;
+      box-shadow: 0 12px 28px rgba(37, 99, 235, 0.22);
+    }
+
+    h1,
+    h2,
+    p {
+      margin: 0;
+    }
+
+    h1 {
+      font-size: clamp(1.8rem, 4vw, 2.75rem);
+      line-height: 1.08;
+      letter-spacing: 0;
+    }
+
+    h2 {
+      font-size: 1.2rem;
+      line-height: 1.25;
+    }
+
+    .muted {
+      color: var(--muted);
+    }
+
+    .screen {
+      display: none;
+    }
+
+    .screen.active {
+      display: block;
+    }
+
+    .card {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface);
+      box-shadow: var(--shadow);
+    }
+
+    .card-header {
+      padding: 22px 24px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .card-header p {
+      margin-top: 6px;
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    .card-body {
+      padding: 24px;
+    }
+
+    .profile-form {
+      display: grid;
+      gap: 16px;
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+
+    label {
+      display: grid;
+      gap: 7px;
+      font-size: 0.9rem;
+      font-weight: 700;
+    }
+
+    input,
+    textarea,
+    select {
+      width: 100%;
+      min-width: 0;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #ffffff;
+      color: var(--text);
+      padding: 12px 13px;
+      outline: none;
+      transition: border-color 160ms ease, box-shadow 160ms ease;
+    }
+
+    textarea {
+      min-height: 170px;
+      resize: vertical;
+    }
+
+    input:focus,
+    textarea:focus,
+    select:focus {
+      border-color: var(--blue);
+      box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12);
+    }
+
+    .helper-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      color: var(--muted);
+      font-size: 0.84rem;
+      font-weight: 500;
+    }
+
+    .actions {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 6px;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      min-height: 42px;
+      padding: 10px 16px;
+      border-radius: var(--radius);
+      background: var(--blue);
+      color: #ffffff;
+      font-weight: 800;
+      box-shadow: 0 12px 24px rgba(37, 99, 235, 0.2);
+      transition: transform 160ms ease, background-color 160ms ease, opacity 160ms ease;
+    }
+
+    .btn:hover {
+      background: var(--blue-dark);
+      transform: translateY(-1px);
+    }
+
+    .btn:disabled {
+      cursor: not-allowed;
+      opacity: 0.48;
+      transform: none;
+      box-shadow: none;
+    }
+
+    .btn-secondary {
+      background: #eaf1ff;
+      color: var(--blue-dark);
+      box-shadow: none;
+    }
+
+    .btn-secondary:hover {
+      background: #dbe8ff;
+    }
+
+    .status {
+      min-height: 22px;
+      color: var(--muted);
+      font-size: 0.88rem;
+    }
+
+    .status.success {
+      color: var(--success);
+    }
+
+    .status.error {
+      color: var(--danger);
+    }
+
+    .main-shell {
+      display: grid;
+      gap: 20px;
+    }
+
+    .job-textarea {
+      min-height: 245px;
+    }
+
+    .output {
+      min-height: 280px;
+      white-space: pre-wrap;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--soft);
+      padding: 18px;
+      color: var(--text);
+      font-size: 1rem;
+    }
+
+    .output.empty {
+      display: grid;
+      place-items: center;
+      text-align: center;
+      color: var(--muted);
+    }
+
+    .output-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 14px;
+    }
+
+    .spinner {
+      width: 16px;
+      height: 16px;
+      border: 2px solid rgba(255, 255, 255, 0.4);
+      border-top-color: #ffffff;
+      border-radius: 50%;
+      animation: spin 800ms linear infinite;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    @media (max-width: 680px) {
+      .page {
+        width: min(100% - 22px, 960px);
+        padding-top: 18px;
+      }
+
+      .topbar,
+      .grid-2,
+      .output-header {
+        display: grid;
+      }
+
+      .card-header,
+      .card-body {
+        padding-left: 16px;
+        padding-right: 16px;
+      }
+
+      .btn {
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header class="topbar">
+      <div class="brand">
+        <div class="mark" aria-hidden="true">P</div>
+        <div>
+          <h1>ProposalAI</h1>
+          <p class="muted">Freelance proposals generated from your saved profile.</p>
+        </div>
+      </div>
+      <button class="btn btn-secondary hidden" id="editProfileBtn" type="button">Edit Profile</button>
+    </header>
+
+    <section id="profileScreen" class="screen" aria-labelledby="profileTitle">
+      <div class="card">
+        <div class="card-header">
+          <h2 id="profileTitle">Set Up Your Profile</h2>
+          <p>This is shown only until your profile is saved. Your details stay in this browser.</p>
+        </div>
+        <div class="card-body">
+          <form id="profileForm" class="profile-form">
+            <label>
+              Full name
+              <input id="fullName" name="fullName" type="text" autocomplete="name" placeholder="Alex Morgan" required />
+            </label>
+
+            <label>
+              Freelance niche
+              <input id="niche" name="niche" type="text" placeholder="Copywriter, graphic designer, Webflow developer" required />
+            </label>
+
+            <div class="grid-2">
+              <label>
+                Years of experience
+                <input id="experience" name="experience" type="number" min="0" step="1" placeholder="5" required />
+              </label>
+
+              <label>
+                Preferred tone
+                <select id="tone" name="tone" required>
+                  <option value="Professional">Professional</option>
+                  <option value="Friendly">Friendly</option>
+                  <option value="Confident">Confident</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="grid-2">
+              <label>
+                Top skill 1
+                <input id="skill1" name="skill1" type="text" placeholder="Landing page copy" required />
+              </label>
+
+              <label>
+                Top skill 2
+                <input id="skill2" name="skill2" type="text" placeholder="Conversion strategy" required />
+              </label>
+            </div>
+
+            <label>
+              Top skill 3
+              <input id="skill3" name="skill3" type="text" placeholder="Email sequences" required />
+            </label>
+
+            <label>
+              One past win or success story
+              <textarea id="pastWin" name="pastWin" placeholder="Helped a SaaS client lift demo bookings by 38% in six weeks." required></textarea>
+            </label>
+
+            <label>
+              Hourly rate or project rate
+              <input id="rate" name="rate" type="text" placeholder="$75/hour or projects from $1,500" required />
+            </label>
+
+            <div class="actions">
+              <button class="btn" type="submit">Save Profile</button>
+              <span id="profileStatus" class="status" role="status"></span>
+            </div>
+          </form>
+        </div>
+      </div>
+    </section>
+
+    <section id="mainScreen" class="screen" aria-labelledby="jobTitle">
+      <div class="main-shell">
+        <section class="card">
+          <div class="card-header">
+            <h2 id="jobTitle">Job Description</h2>
+            <p>Paste the client post, brief, or RFP. Generation unlocks after 50 characters.</p>
+          </div>
+          <div class="card-body">
+            <label>
+              Job description
+              <textarea id="jobDescription" class="job-textarea" placeholder="Paste the job description here..." required></textarea>
+            </label>
+            <div class="helper-row">
+              <span id="charCount">0 characters</span>
+              <span>Minimum 50 characters</span>
+            </div>
+            <div class="actions">
+              <button class="btn" id="generateBtn" type="button" disabled>
+                <span id="generateLabel">Generate Proposal</span>
+              </button>
+              <button class="btn btn-secondary" id="clearJob" type="button">Clear Job</button>
+              <span id="generateStatus" class="status" role="status"></span>
+            </div>
+          </div>
+        </section>
+
+        <section class="card" aria-labelledby="outputTitle">
+          <div class="card-header">
+            <h2 id="outputTitle">Ready-to-Send Proposal</h2>
+            <p>Generated with GitHub Models using your saved profile.</p>
+          </div>
+          <div class="card-body">
+            <div class="output-header">
+              <span id="outputMeta" class="muted">No proposal generated yet.</span>
+              <button class="btn btn-secondary hidden" id="copyBtn" type="button">Copy to Clipboard</button>
+            </div>
+            <div id="proposalOutput" class="output empty">Your proposal will appear here after generation.</div>
+          </div>
+        </section>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const PROFILE_KEY = "proposalai.profile.v3";
+    const LEGACY_PROFILE_KEYS = ["proposalai.profile.v2", "proposalai.profile.v1"];
+    const API_PATH = "/api/generate-proposal";
+    const MIN_JOB_CHARS = 50;
+
+    const fields = {
+      fullName: document.getElementById("fullName"),
+      niche: document.getElementById("niche"),
+      experience: document.getElementById("experience"),
+      tone: document.getElementById("tone"),
+      skill1: document.getElementById("skill1"),
+      skill2: document.getElementById("skill2"),
+      skill3: document.getElementById("skill3"),
+      pastWin: document.getElementById("pastWin"),
+      rate: document.getElementById("rate"),
+      jobDescription: document.getElementById("jobDescription")
+    };
+
+    const profileScreen = document.getElementById("profileScreen");
+    const mainScreen = document.getElementById("mainScreen");
+    const profileForm = document.getElementById("profileForm");
+    const editProfileBtn = document.getElementById("editProfileBtn");
+    const profileStatus = document.getElementById("profileStatus");
+    const generateStatus = document.getElementById("generateStatus");
+    const generateBtn = document.getElementById("generateBtn");
+    const generateLabel = document.getElementById("generateLabel");
+    const clearJobBtn = document.getElementById("clearJob");
+    const copyBtn = document.getElementById("copyBtn");
+    const proposalOutput = document.getElementById("proposalOutput");
+    const outputMeta = document.getElementById("outputMeta");
+    const charCount = document.getElementById("charCount");
+
+    function setStatus(element, message, type = "") {
+      element.textContent = message;
+      element.className = `status ${type}`.trim();
+    }
+
+    function showScreen(screen) {
+      const isProfile = screen === "profile";
+      profileScreen.classList.toggle("active", isProfile);
+      mainScreen.classList.toggle("active", !isProfile);
+      editProfileBtn.classList.toggle("hidden", isProfile);
+    }
+
+    function getProfile() {
+      return {
+        fullName: fields.fullName.value.trim(),
+        niche: fields.niche.value.trim(),
+        experience: fields.experience.value.trim(),
+        tone: fields.tone.value,
+        skills: [fields.skill1.value.trim(), fields.skill2.value.trim(), fields.skill3.value.trim()],
+        pastWin: fields.pastWin.value.trim(),
+        rate: fields.rate.value.trim()
+      };
+    }
+
+    function validateProfile(profile) {
+      const missing = [];
+      if (!profile.fullName) missing.push("full name");
+      if (!profile.niche) missing.push("freelance niche");
+      if (!profile.experience) missing.push("years of experience");
+      if (profile.skills.some((skill) => !skill)) missing.push("top 3 skills");
+      if (!profile.pastWin) missing.push("past win");
+      if (!profile.rate) missing.push("rate");
+      return missing;
+    }
+
+    function writeProfileToForm(profile) {
+      fields.fullName.value = profile.fullName || "";
+      fields.niche.value = profile.niche || "";
+      fields.experience.value = profile.experience || "";
+      fields.tone.value = profile.tone || "Professional";
+      fields.skill1.value = profile.skills?.[0] || "";
+      fields.skill2.value = profile.skills?.[1] || "";
+      fields.skill3.value = profile.skills?.[2] || "";
+      fields.pastWin.value = profile.pastWin || "";
+      fields.rate.value = profile.rate || "";
+    }
+
+    function loadSavedProfile() {
+      const keys = [PROFILE_KEY, ...LEGACY_PROFILE_KEYS];
+
+      for (const key of keys) {
+        const raw = localStorage.getItem(key);
+        if (!raw) continue;
+
+        try {
+          const profile = JSON.parse(raw);
+          if (validateProfile(profile).length === 0) {
+            localStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
+            writeProfileToForm(profile);
+            return profile;
+          }
+        } catch {
+          localStorage.removeItem(key);
+        }
+      }
+
+      return null;
+    }
+
+    function saveProfile() {
+      const profile = getProfile();
+      const missing = validateProfile(profile);
+
+      if (missing.length) {
+        setStatus(profileStatus, `Complete: ${missing.join(", ")}.`, "error");
+        return false;
+      }
+
+      localStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
+      setStatus(profileStatus, "Profile saved. Opening the app...", "success");
+
+      window.setTimeout(() => {
+        setStatus(profileStatus, "");
+        showScreen("main");
+        fields.jobDescription.focus();
+      }, 650);
+
+      return true;
+    }
+
+    function setGenerating(isGenerating) {
+      generateBtn.disabled = isGenerating || fields.jobDescription.value.trim().length < MIN_JOB_CHARS;
+      generateLabel.innerHTML = isGenerating ? '<span class="spinner" aria-hidden="true"></span> Generating...' : "Generate Proposal";
+    }
+
+    function wordCount(text) {
+      return text.trim().split(/\s+/).filter(Boolean).length;
+    }
+
+    function updateJobCount() {
+      const count = fields.jobDescription.value.trim().length;
+      charCount.textContent = `${count} character${count === 1 ? "" : "s"}`;
+      generateBtn.disabled = count < MIN_JOB_CHARS;
+      if (count >= MIN_JOB_CHARS && generateStatus.textContent === "Add at least 50 characters.") {
+        setStatus(generateStatus, "");
+      }
+    }
+
+    async function generateProposal() {
+      const profile = getProfile();
+      const jobDescription = fields.jobDescription.value.trim();
+
+      if (validateProfile(profile).length) {
+        showScreen("profile");
+        setStatus(profileStatus, "Save your profile before generating.", "error");
+        return;
+      }
+
+      if (jobDescription.length < MIN_JOB_CHARS) {
+        setStatus(generateStatus, "Add at least 50 characters.", "error");
+        fields.jobDescription.focus();
+        return;
+      }
+
+      if (window.location.protocol === "file:") {
+        setStatus(generateStatus, "Generation works on the live Netlify site, not from a direct file open.", "error");
+        return;
+      }
+
+      setGenerating(true);
+      setStatus(generateStatus, "Writing proposal...");
+      proposalOutput.classList.remove("empty");
+      proposalOutput.textContent = "Generating your proposal...";
+      copyBtn.classList.add("hidden");
+      outputMeta.textContent = "Working...";
+
+      try {
+        const response = await fetch(API_PATH, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ profile, jobDescription })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data?.error || "The GitHub Models request failed.");
+        }
+
+        const proposal = data?.proposal?.trim();
+        if (!proposal) {
+          throw new Error("GitHub Models returned an empty proposal.");
+        }
+
+        proposalOutput.textContent = proposal;
+        proposalOutput.classList.remove("empty");
+        copyBtn.classList.remove("hidden");
+        outputMeta.textContent = `${wordCount(proposal)} words. Ready to copy.`;
+        setStatus(generateStatus, "Proposal generated.", "success");
+      } catch (error) {
+        proposalOutput.classList.add("empty");
+        proposalOutput.textContent = "The proposal could not be generated. Try again in a moment.";
+        outputMeta.textContent = "No proposal generated.";
+        setStatus(generateStatus, error.message || "Something went wrong.", "error");
+      } finally {
+        setGenerating(false);
+      }
+    }
+
+    async function copyProposal() {
+      const text = proposalOutput.textContent.trim();
+      if (!text || proposalOutput.classList.contains("empty")) return;
+
+      try {
+        await navigator.clipboard.writeText(text);
+      } catch {
+        const temp = document.createElement("textarea");
+        temp.value = text;
+        temp.style.position = "fixed";
+        temp.style.opacity = "0";
+        document.body.appendChild(temp);
+        temp.select();
+        document.execCommand("copy");
+        temp.remove();
+      }
+
+      outputMeta.textContent = "Copied to clipboard.";
+      window.setTimeout(() => {
+        outputMeta.textContent = `${wordCount(text)} words. Ready to copy.`;
+      }, 2200);
+    }
+
+    profileForm.addEventListener("submit", (event) => {
+      event.preventDefault();
+      saveProfile();
+    });
+
+    editProfileBtn.addEventListener("click", () => {
+      setStatus(profileStatus, "");
+      showScreen("profile");
+    });
+
+    fields.jobDescription.addEventListener("input", updateJobCount);
+    generateBtn.addEventListener("click", generateProposal);
+    copyBtn.addEventListener("click", copyProposal);
+    clearJobBtn.addEventListener("click", () => {
+      fields.jobDescription.value = "";
+      updateJobCount();
+      fields.jobDescription.focus();
+    });
+
+    const savedProfile = loadSavedProfile();
+    showScreen(savedProfile ? "main" : "profile");
+    updateJobCount();
+  </script>
+</body>
+</html>
