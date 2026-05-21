@@ -23,6 +23,28 @@ TEMPLATE_DIR = DASHBOARD_DIR / "templates"
 class RenderServiceHandler(BaseHTTPRequestHandler):
     server_version = "ProposalAIRenderService/0.1"
 
+    def do_HEAD(self) -> None:
+        parsed = urlparse(self.path)
+        path = unquote(parsed.path)
+        if path == "/health":
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return
+        if path in {"/", "/index.html"}:
+            if not self._dashboard_authorized(parsed.query):
+                self.send_error(401, "Unauthorized")
+                return
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return
+        self.send_error(404, "Not found")
+
     def do_GET(self) -> None:
         parsed = urlparse(self.path)
         path = unquote(parsed.path)
