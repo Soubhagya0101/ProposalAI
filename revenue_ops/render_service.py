@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import mimetypes
 import os
+import re
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -12,6 +13,7 @@ from .brevo_webhooks import BrevoWebhookProcessor
 from .cloud_scheduler import CloudScheduler
 from .config import RevenueOpsConfig
 from .dashboard.adapter import load_dashboard_payload
+from .time_utils import is_business_hours_ist, now_ist
 from .workflow import RevenueAgent
 
 
@@ -62,6 +64,12 @@ class RenderServiceHandler(BaseHTTPRequestHandler):
                 self.send_error(401, "Unauthorized")
                 return
             self._send_json(load_dashboard_payload())
+            return
+        if path == "/api/debug":
+            if not self._dashboard_authorized(parsed.query):
+                self.send_error(401, "Unauthorized")
+                return
+            self._send_json(self._debug_payload())
             return
         if path.startswith("/static/"):
             requested = (STATIC_DIR / path.removeprefix("/static/")).resolve()
@@ -130,6 +138,56 @@ class RenderServiceHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def _debug_payload(self) -> dict:
+        config = self.server.config  # type: ignore[attr-defined]
+        agent = RevenueAgent(config)
+        leads = agent.store.leads.all()
+        messages = agent.store.messages.all()
+        events = agent.store.events.all()
+        current = now_ist()
+        queued = [message for message in messages if message.channel == "email" and message.status == "queued"]
+        sent = [message for message in messages if message.channel == "email" and message.status == "sent"]
+        errored = [message for message in messages if message.channel == "email" and message.status == "error"]
+        valid_email_leads = [lead for lead in leads if lead.email]
+        return {
+            "now_ist": current.isoformat(timespec="seconds"),
+            "inside_business_hours": is_business_hours_ist(
+                config.email_business_start_hour_ist,
+                config.email_business_end_hour_ist,
+            ),
+            "store": {
+                "data_dir": str(config.data_dir),
+                "google_sheets_enabled": config.google_enabled,
+            },
+            "config_ready": {
+                "send_enabled": config.send_enabled,
+                "brevo_api_enabled": bool(config.brevo_api_key),
+                "brevo_smtp_enabled": bool(config.brevo_email and config.brevo_smtp_key),
+                "brevo_prefer_api": config.brevo_prefer_api,
+                "physical_address_set": bool(config.physical_address),
+                "report_email_set": bool(config.report_email),
+                "hunter_configured": bool(config.hunter_api_key),
+                "imap_enabled": config.imap_enabled,
+            },
+            "counts": {
+                "leads": len(leads),
+                "leads_with_email": len(valid_email_leads),
+                "email_messages": len([message for message in messages if message.channel == "email"]),
+                "queued": len(queued),
+                "sent": len(sent),
+                "errored": len(errored),
+                "events": len(events),
+            },
+            "recent_events": [
+                {
+                    "time": event.occurred_at,
+                    "kind": event.kind,
+                    "detail": _redact_event_detail(event.detail),
+                }
+                for event in events[-12:]
+            ],
+        }
+
 
 def run_render_service() -> None:
     config = RevenueOpsConfig.from_env()
@@ -149,3 +207,10 @@ def run_render_service() -> None:
         server.serve_forever()
     finally:
         server.server_close()
+
+
+def _redact_event_detail(value: str) -> str:
+    text = str(value or "")
+    text = re.sub(r"\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b", "[email]", text, flags=re.IGNORECASE)
+    text = re.sub(r"(api[_-]?key|smtp[_-]?key|password|secret|token)[^,}\s]*", r"\1=[redacted]", text, flags=re.IGNORECASE)
+    return text[:220]

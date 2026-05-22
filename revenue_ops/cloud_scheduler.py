@@ -43,11 +43,14 @@ class CloudScheduler:
         if current.hour >= 9:
             results.append(
                 self._run_once_per_day(
-                    "email_pipeline",
-                    lambda: {
-                        "found": self.lead_finder.run_all(),
-                        **self.email_campaign.run_pipeline(send=True),
-                    },
+                    "lead_finder",
+                    lambda: {"found": self.lead_finder.run_all()},
+                )
+            )
+            results.append(
+                self._run_once_per_hour(
+                    "outreach_queue",
+                    lambda: self.email_campaign.queue_new_outreach(),
                 )
             )
 
@@ -57,16 +60,14 @@ class CloudScheduler:
                     "followups",
                     lambda: {
                         "queued": self.email_campaign.queue_followups(),
-                        "sent": self.email_campaign.send_queued(),
                     },
                 )
             )
 
         if is_business_hours_ist(self.config.email_business_start_hour_ist, self.config.email_business_end_hour_ist):
+            results.append(self._run_once_per_hour("email_sender", lambda: self.email_campaign.send_queued()))
             if current.hour in {9, 11, 13, 15, 17}:
                 results.append(self._run_once_per_hour("check_replies", lambda: self.email_campaign.check_replies()))
-            if current.hour >= 11:
-                results.append(self._run_once_per_hour("email_retry", lambda: self.email_campaign.send_queued()))
 
         if current.hour >= 20 and not self._summary_sent_today():
             results.append(self._run_once_per_day("daily_summary_20", lambda: self.email_campaign.send_summary_email()))
