@@ -9,7 +9,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from ..config import RevenueOpsConfig
 from ..models import Event, Feedback, Lead, Message, Metric
+from ..workflow import RevenueAgent
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -26,6 +28,9 @@ class StoreSource:
 
 def load_dashboard_payload() -> dict[str, Any]:
     _load_env()
+    live_payload = _load_live_store_payload()
+    if live_payload:
+        return live_payload
     source = _find_or_create_store()
     if source.kind == "json":
         raw = _load_json(source.path)
@@ -41,6 +46,32 @@ def load_dashboard_payload() -> dict[str, Any]:
         "loaded_at": _now_iso(),
     }
     return normalized
+
+
+def _load_live_store_payload() -> dict[str, Any] | None:
+    try:
+        config = RevenueOpsConfig.from_env()
+        if not config.google_enabled:
+            return None
+        agent = RevenueAgent(config)
+        raw = {
+            "leads": [lead.to_dict() for lead in agent.store.leads.all()],
+            "messages": [message.to_dict() for message in agent.store.messages.all()],
+            "events": [event.to_dict() for event in agent.store.events.all()],
+            "feedback": [item.to_dict() for item in agent.store.feedback.all()],
+            "metrics": [metric.to_dict() for metric in agent.store.metrics.all()],
+        }
+        raw["replies"] = [event for event in raw["events"] if _lower(event.get("kind")) == "reply"]
+        normalized = _normalize_store(raw)
+        normalized["source"] = {
+            "path": "google_sheets",
+            "kind": "google_sheets",
+            "created": False,
+            "loaded_at": _now_iso(),
+        }
+        return normalized
+    except Exception:
+        return None
 
 
 def _find_or_create_store() -> StoreSource:
