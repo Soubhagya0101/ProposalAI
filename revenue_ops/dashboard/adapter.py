@@ -9,6 +9,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from ..models import Event, Feedback, Lead, Message, Metric
+
 
 ROOT = Path(__file__).resolve().parents[2]
 DASHBOARD_DIR = Path(__file__).resolve().parent
@@ -47,11 +49,16 @@ def _find_or_create_store() -> StoreSource:
 
     if env_path:
         path = Path(env_path).expanduser()
-        candidates.append((path, _kind_for(path)))
+        kind = _kind_for(path)
+        if kind == "csv_dir":
+            _ensure_csv_store(path)
+        candidates.append((path, kind))
 
     data_dir = os.environ.get("PROPOSALAI_REVENUE_DATA_DIR")
     if data_dir:
-        candidates.append((Path(data_dir).expanduser(), "csv_dir"))
+        path = Path(data_dir).expanduser()
+        _ensure_csv_store(path)
+        candidates.append((path, "csv_dir"))
 
     candidates.extend(
         [
@@ -73,6 +80,22 @@ def _find_or_create_store() -> StoreSource:
     SAMPLE_STORE.parent.mkdir(parents=True, exist_ok=True)
     SAMPLE_STORE.write_text(json.dumps(_sample_store(), indent=2), encoding="utf-8")
     return StoreSource(path=SAMPLE_STORE, kind="json", created=True)
+
+
+def _ensure_csv_store(path: Path) -> None:
+    path.mkdir(parents=True, exist_ok=True)
+    tables = {
+        "leads.csv": Lead.fieldnames(),
+        "messages.csv": Message.fieldnames(),
+        "events.csv": Event.fieldnames(),
+        "feedback.csv": Feedback.fieldnames(),
+        "metrics.csv": Metric.fieldnames(),
+    }
+    for filename, headers in tables.items():
+        target = path / filename
+        if not target.exists():
+            with target.open("w", newline="", encoding="utf-8") as handle:
+                csv.writer(handle).writerow(headers)
 
 
 def _kind_for(path: Path) -> str:
