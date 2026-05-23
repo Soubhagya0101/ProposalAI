@@ -44,6 +44,10 @@ function safeTrim(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function getGithubModelsToken() {
+  return process.env.GITHUB_MODELS_TOKEN || process.env.GITHUB_TOKEN || "";
+}
+
 function extractClientGreeting(jobDescription: string) {
   const patterns = [
     /\b(?:client|company|brand|business|organization)\s*(?:name\s*[:=-]?|is\s*|[:=-])\s*([A-Z][A-Za-z0-9&'. -]{1,60})/i,
@@ -202,7 +206,7 @@ export default async (req: Request, _context: Context) => {
 
   const url = new URL(req.url);
   if (url.searchParams.get("test") === "1") {
-    const githubToken = Netlify.env.get("GITHUB_MODELS_TOKEN") || "";
+    const githubToken = getGithubModelsToken();
     if (!githubToken) {
       return json({ error: "GitHub Models token is not configured on the server." }, 500);
     }
@@ -225,7 +229,7 @@ export default async (req: Request, _context: Context) => {
     return json({ error: "Invalid JSON request." }, 400);
   }
 
-  const githubToken = Netlify.env.get("GITHUB_MODELS_TOKEN") || "";
+  const githubToken = getGithubModelsToken();
   const profile = normalizeProfile(body.profile);
   const jobDescription = safeTrim(body.jobDescription);
 
