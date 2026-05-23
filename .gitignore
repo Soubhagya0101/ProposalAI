@@ -2,6 +2,7 @@ node_modules/
 .netlify/
 .env
 .env.*
+!.env.example
 revenue_ops_data/
 __pycache__/
 *.py[cod]
