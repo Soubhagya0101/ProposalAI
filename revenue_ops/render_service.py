@@ -7,16 +7,19 @@ import re
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import parse_qs, unquote, urlparse
+from urllib.parse import parse_qs, quote, unquote, urlparse
 
 from .brevo_webhooks import BrevoWebhookProcessor
 from .cloud_scheduler import CloudScheduler
 from .config import RevenueOpsConfig
 from .dashboard.adapter import load_dashboard_payload
+from .proposal_generator import generate_proposal_response
 from .time_utils import is_business_hours_ist, now_ist
 from .workflow import RevenueAgent
 
 
+ROOT = Path(__file__).resolve().parents[1]
+PUBLIC_DIR = ROOT / "public"
 DASHBOARD_DIR = Path(__file__).resolve().parent / "dashboard"
 STATIC_DIR = DASHBOARD_DIR / "static"
 TEMPLATE_DIR = DASHBOARD_DIR / "templates"
@@ -36,14 +39,13 @@ class RenderServiceHandler(BaseHTTPRequestHandler):
             self.end_headers()
             return
         if path in {"/", "/index.html"}:
+            self._send_head_file(PUBLIC_DIR / "index.html", "text/html; charset=utf-8")
+            return
+        if path == "/ops":
             if not self._dashboard_authorized(parsed.query):
                 self.send_error(401, "Unauthorized")
                 return
-            self.send_response(200)
-            self.send_header("Content-Type", "text/html; charset=utf-8")
-            self.send_header("Cache-Control", "no-store")
-            self.send_header("Content-Length", "0")
-            self.end_headers()
+            self._send_head_file(TEMPLATE_DIR / "index.html", "text/html; charset=utf-8")
             return
         self.send_error(404, "Not found")
 
@@ -54,10 +56,13 @@ class RenderServiceHandler(BaseHTTPRequestHandler):
             self._send_json({"ok": True, "service": "proposalai-revenue-ops"})
             return
         if path in {"/", "/index.html"}:
+            self._send_file(PUBLIC_DIR / "index.html", "text/html; charset=utf-8")
+            return
+        if path == "/ops":
             if not self._dashboard_authorized(parsed.query):
                 self.send_error(401, "Unauthorized")
                 return
-            self._send_file(TEMPLATE_DIR / "index.html", "text/html; charset=utf-8")
+            self._send_dashboard_index(parsed.query)
             return
         if path == "/api/summary":
             if not self._dashboard_authorized(parsed.query):
@@ -71,15 +76,24 @@ class RenderServiceHandler(BaseHTTPRequestHandler):
                 return
             self._send_json(self._debug_payload())
             return
-        if path.startswith("/static/"):
-            requested = (STATIC_DIR / path.removeprefix("/static/")).resolve()
+        if path.startswith("/ops/static/"):
+            if not self._dashboard_authorized(parsed.query):
+                self.send_error(401, "Unauthorized")
+                return
+            requested = (STATIC_DIR / path.removeprefix("/ops/static/")).resolve()
             if STATIC_DIR.resolve() in requested.parents and requested.exists():
                 self._send_file(requested)
                 return
+        if path.startswith("/static/"):
+            self.send_error(404, "Dashboard assets moved to /ops/static")
+            return
         self.send_error(404, "Not found")
 
     def do_POST(self) -> None:
         parsed = urlparse(self.path)
+        if parsed.path == "/api/generate-proposal":
+            self._handle_generate_proposal(parsed.query)
+            return
         if parsed.path not in {"/brevo/events", "/brevo/inbound"}:
             self.send_error(404, "Not found")
             return
@@ -116,14 +130,25 @@ class RenderServiceHandler(BaseHTTPRequestHandler):
         header_secret = self.headers.get("X-ProposalAI-Dashboard-Secret", "")
         return secret in {query_secret, header_secret}
 
-    def _send_json(self, payload: dict) -> None:
+    def _send_json(self, payload: dict, status: int = 200) -> None:
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
-        self.send_response(200)
+        self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Cache-Control", "no-store")
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
+
+    def _send_head_file(self, path: Path, content_type: str | None = None) -> None:
+        if not path.exists():
+            self.send_error(404, "Not found")
+            return
+        guessed_type = content_type or mimetypes.guess_type(str(path))[0] or "application/octet-stream"
+        self.send_response(200)
+        self.send_header("Content-Type", guessed_type)
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("Content-Length", "0")
+        self.end_headers()
 
     def _send_file(self, path: Path, content_type: str | None = None) -> None:
         if not path.exists():
@@ -137,6 +162,34 @@ class RenderServiceHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
+
+    def _send_dashboard_index(self, query: str) -> None:
+        secret = (parse_qs(query).get("secret") or [""])[0]
+        suffix = f"?secret={quote(secret)}" if secret else ""
+        body = (TEMPLATE_DIR / "index.html").read_text(encoding="utf-8")
+        body = body.replace('href="/static/dashboard.css"', f'href="/ops/static/dashboard.css{suffix}"')
+        body = body.replace('src="/static/dashboard.js"', f'src="/ops/static/dashboard.js{suffix}"')
+        encoded = body.encode("utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("Content-Length", str(len(encoded)))
+        self.end_headers()
+        self.wfile.write(encoded)
+
+    def _handle_generate_proposal(self, query: str) -> None:
+        length = int(self.headers.get("Content-Length", "0") or 0)
+        raw = self.rfile.read(length) if length else b"{}"
+        try:
+            payload = json.loads(raw.decode("utf-8"))
+        except json.JSONDecodeError:
+            self._send_json({"error": "Invalid JSON request."}, 400)
+            return
+        if not isinstance(payload, dict):
+            self._send_json({"error": "Request body must be a JSON object."}, 400)
+            return
+        result = generate_proposal_response(payload, test_mode=(parse_qs(query).get("test") or [""])[0] == "1")
+        self._send_json(result.payload, result.status)
 
     def _debug_payload(self) -> dict:
         config = self.server.config  # type: ignore[attr-defined]
@@ -203,7 +256,7 @@ def run_render_service() -> None:
     server.config = config  # type: ignore[attr-defined]
     server.processor = processor  # type: ignore[attr-defined]
     print(f"ProposalAI Render service listening on 0.0.0.0:{port}", flush=True)
-    print("Routes: /health, /, /api/summary, /brevo/events, /brevo/inbound", flush=True)
+    print("Routes: /health, /, /api/generate-proposal, /ops, /api/summary, /brevo/events, /brevo/inbound", flush=True)
     try:
         server.serve_forever()
     finally:

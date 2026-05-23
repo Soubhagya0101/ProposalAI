@@ -1,6 +1,6 @@
 # ProposalAI
 
-ProposalAI is a single-page freelancer proposal generator that uses GitHub Models (`openai/gpt-4o`) through a Netlify Function.
+ProposalAI is a single-page freelancer proposal generator that uses GitHub Models (`openai/gpt-4o-mini`) through the Render Python service.
 
 ## How it works
 
@@ -8,7 +8,7 @@ ProposalAI is a single-page freelancer proposal generator that uses GitHub Model
 2. Paste a job description.
 3. Generate a 300-400 word proposal in the selected tone.
 
-The GitHub Models token is stored as a Netlify environment variable named `GITHUB_MODELS_TOKEN`. The browser never shows or stores the token.
+The GitHub Models token is stored as a server environment variable named `GITHUB_MODELS_TOKEN`. The browser never shows or stores the token.
 
 ## Revenue Ops
 
@@ -49,4 +49,5 @@ Cloud services included:
 
 - `scheduler`: always-on daily lead finder, sender, follow-ups, retries, and summary
 - `webhook`: Brevo inbound/event receiver
-- `dashboard`: local-only dashboard, viewed through an SSH tunnel
+- `app`: public ProposalAI generator at the Render root URL
+- `dashboard`: private revenue dashboard at `/ops?secret=...`

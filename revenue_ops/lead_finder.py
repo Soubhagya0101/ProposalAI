@@ -284,7 +284,7 @@ class LeadFinder:
     def _get_json(url: str) -> dict:
         request = urllib.request.Request(
             url,
-            headers={"User-Agent": "ProposalAIRevenueOps/1.0 (+https://proposalai-generator.netlify.app)"},
+            headers={"User-Agent": "ProposalAIRevenueOps/1.0 (+https://proposalai-revenue-ops.onrender.com)"},
         )
         return LeadFinder._open_json(request)
 
@@ -295,7 +295,7 @@ class LeadFinder:
             data=json.dumps(payload).encode("utf-8"),
             headers={
                 "Content-Type": "application/json",
-                "User-Agent": "ProposalAIRevenueOps/1.0 (+https://proposalai-generator.netlify.app)",
+                "User-Agent": "ProposalAIRevenueOps/1.0 (+https://proposalai-revenue-ops.onrender.com)",
             },
             method="POST",
         )

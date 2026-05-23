@@ -13,7 +13,7 @@ services:
       - key: PROPOSALAI_REVENUE_DATA_DIR
         value: /app/revenue_ops_data
       - key: PROPOSALAI_URL
-        value: https://proposalai-generator.netlify.app
+        value: https://proposalai-revenue-ops.onrender.com
       - key: PROPOSALAI_WEBHOOK_HOST
         value: 0.0.0.0
       - key: PROPOSALAI_WEBHOOK_PORT
@@ -67,4 +67,6 @@ services:
       - key: GOOGLE_SERVICE_ACCOUNT_JSON
         sync: false
       - key: PROPOSALAI_GOOGLE_SHEET_ID
+        sync: false
+      - key: GITHUB_MODELS_TOKEN
         sync: false

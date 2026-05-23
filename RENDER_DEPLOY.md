@@ -3,7 +3,9 @@
 This deployment uses one free Render Docker web service. It runs:
 
 - a small HTTP server for `/health`
-- the private dashboard at `/?secret=...`
+- the public ProposalAI generator at `/`
+- the private dashboard at `/ops?secret=...`
+- the GitHub Models proposal endpoint at `/api/generate-proposal`
 - Brevo webhook endpoints
 - the revenue scheduler loop in the background
 
@@ -17,6 +19,7 @@ Render's free web services can spin down after inactivity, and Render background
 - Hunter API key
 - Sender physical mailing address
 - Report email
+- GitHub Models token
 - Strongly recommended: Google Sheets service-account JSON for persistent state
 
 ## Step 1: Push This Project To GitHub
@@ -63,6 +66,7 @@ BREVO_API_KEY
 BREVO_REPLY_TO_EMAIL
 PROPOSALAI_PHYSICAL_ADDRESS
 PROPOSALAI_REPORT_EMAIL
+GITHUB_MODELS_TOKEN
 ```
 
 Recommended for persistence:
@@ -99,6 +103,12 @@ Expected:
 {"ok": true, "service": "proposalai-revenue-ops"}
 ```
 
+The public ProposalAI app should load at:
+
+```text
+https://YOUR-RENDER-SERVICE.onrender.com/
+```
+
 ## Step 5: Open The Dashboard
 
 In Render, copy `PROPOSALAI_DASHBOARD_SECRET` from environment variables.
@@ -106,7 +116,7 @@ In Render, copy `PROPOSALAI_DASHBOARD_SECRET` from environment variables.
 Open:
 
 ```text
-https://YOUR-RENDER-SERVICE.onrender.com/?secret=YOUR_PROPOSALAI_DASHBOARD_SECRET
+https://YOUR-RENDER-SERVICE.onrender.com/ops?secret=YOUR_PROPOSALAI_DASHBOARD_SECRET
 ```
 
 ## Step 6: Keep It Awake For Free
