@@ -620,10 +620,19 @@
           body: JSON.stringify({ profile, jobDescription })
         });
 
-        const data = await response.json();
+        const responseText = await response.text();
+        let data = {};
+
+        if (responseText.trim()) {
+          try {
+            data = JSON.parse(responseText);
+          } catch {
+            throw new Error(`Server returned non-JSON response (${response.status}): ${responseText.slice(0, 240)}`);
+          }
+        }
 
         if (!response.ok) {
-          throw new Error(data?.error || "The GitHub Models request failed.");
+          throw new Error(data?.error || responseText || `Request failed with HTTP ${response.status}.`);
         }
 
         const proposal = data?.proposal?.trim();

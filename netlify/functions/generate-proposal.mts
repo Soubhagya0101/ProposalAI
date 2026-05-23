@@ -1,7 +1,7 @@
 import type { Config, Context } from "@netlify/functions";
 
 const GITHUB_MODELS_URL = "https://models.github.ai/inference/chat/completions";
-const MODEL_ID = "openai/gpt-4o";
+const MODEL_ID = "openai/gpt-4o-mini";
 
 type Profile = {
   fullName?: string;
@@ -25,6 +25,19 @@ function json(data: unknown, status = 200) {
       "Content-Type": "application/json"
     }
   });
+}
+
+async function readJsonResponse(response: Response) {
+  const text = await response.text();
+  if (!text.trim()) {
+    return { data: null, text: "" };
+  }
+
+  try {
+    return { data: JSON.parse(text), text };
+  } catch {
+    return { data: null, text };
+  }
 }
 
 function safeTrim(value: unknown) {
@@ -115,7 +128,7 @@ async function requestProposal(githubToken: string, prompt: string, temperature 
       "Accept": "application/vnd.github+json",
       "Authorization": `Bearer ${githubToken}`,
       "Content-Type": "application/json",
-      "X-GitHub-Api-Version": "2026-03-10"
+      "X-GitHub-Api-Version": "2022-11-28"
     },
     body: JSON.stringify({
       model: MODEL_ID,
@@ -134,10 +147,13 @@ async function requestProposal(githubToken: string, prompt: string, temperature 
     })
   });
 
-  const data = await githubResponse.json().catch(() => ({}));
+  const { data, text } = await readJsonResponse(githubResponse);
 
   if (!githubResponse.ok) {
-    const message = typeof data?.message === "string" ? data.message : "GitHub Models request failed.";
+    const detail = typeof data?.message === "string"
+      ? data.message
+      : text.trim() || githubResponse.statusText || "No response body returned.";
+    const message = `GitHub Models request failed (${githubResponse.status}): ${detail}`;
     return { error: message, status: githubResponse.status };
   }
 
@@ -182,6 +198,23 @@ function normalizeProfile(profile: Profile | undefined): Required<Profile> | nul
 export default async (req: Request, _context: Context) => {
   if (req.method !== "POST") {
     return json({ error: "Method not allowed." }, 405);
+  }
+
+  const url = new URL(req.url);
+  if (url.searchParams.get("test") === "1") {
+    const githubToken = Netlify.env.get("GITHUB_MODELS_TOKEN") || "";
+    if (!githubToken) {
+      return json({ error: "GitHub Models token is not configured on the server." }, 500);
+    }
+    const result = await requestProposal(
+      githubToken,
+      "Reply with exactly this sentence: ProposalAI GitHub Models connection works.",
+      0
+    );
+    if (result.error || !result.proposal) {
+      return json({ error: result.error || "GitHub Models test failed." }, result.status || 502);
+    }
+    return json({ ok: true, model: MODEL_ID, response: result.proposal });
   }
 
   let body: RequestBody;

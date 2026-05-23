@@ -40,6 +40,15 @@ class CloudScheduler:
         current = now_ist()
         results: list[dict[str, Any]] = []
 
+        if self._automation_stopped():
+            return [
+                {
+                    "task": "automation_stop",
+                    "status": "stopped",
+                    "stop_date": self.config.automation_stop_date,
+                }
+            ]
+
         if current.hour >= 9:
             results.append(
                 self._run_once_per_day(
@@ -77,6 +86,15 @@ class CloudScheduler:
                 results.append(self._run_once_per_day("daily_summary_backup_2030", lambda: self.email_campaign.send_summary_email()))
 
         return [result for result in results if result.get("status") != "already_ran"]
+
+    def _automation_stopped(self) -> bool:
+        if not self.config.automation_stop_date:
+            return False
+        try:
+            stop_date = datetime.strptime(self.config.automation_stop_date, "%Y-%m-%d").date()
+        except ValueError:
+            return False
+        return now_ist().date() > stop_date
 
     def _run_once_per_day(self, name: str, action: Callable[[], dict[str, Any]]) -> dict[str, Any]:
         return self._run_once(f"{today_ist()}:{name}", name, action)

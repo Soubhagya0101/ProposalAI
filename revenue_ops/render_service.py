@@ -168,6 +168,7 @@ class RenderServiceHandler(BaseHTTPRequestHandler):
                 "report_email_set": bool(config.report_email),
                 "hunter_configured": bool(config.hunter_api_key),
                 "imap_enabled": config.imap_enabled,
+                "automation_stop_date": config.automation_stop_date or "",
             },
             "counts": {
                 "leads": len(leads),

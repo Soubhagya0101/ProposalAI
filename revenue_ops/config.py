@@ -51,6 +51,7 @@ class RevenueOpsConfig:
     twilio_to_whatsapp: str | None = None
     sender_name: str = "ProposalAI"
     report_email: str | None = None
+    automation_stop_date: str | None = None
     max_followups: int = 2
     followup_interval_days: int = 3
     hot_score_threshold: int = 75
@@ -106,6 +107,7 @@ class RevenueOpsConfig:
             twilio_to_whatsapp=clean_env("TWILIO_TO_WHATSAPP"),
             sender_name=os.getenv("PROPOSALAI_SENDER_NAME", "ProposalAI"),
             report_email=clean_env("PROPOSALAI_REPORT_EMAIL"),
+            automation_stop_date=clean_env("PROPOSALAI_AUTOMATION_STOP_DATE"),
             max_followups=int(os.getenv("PROPOSALAI_MAX_FOLLOWUPS", "2")),
             followup_interval_days=int(os.getenv("PROPOSALAI_FOLLOWUP_INTERVAL_DAYS", "3")),
             hot_score_threshold=int(os.getenv("PROPOSALAI_HOT_SCORE_THRESHOLD", "75")),
