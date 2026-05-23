@@ -1,76 +1,15 @@
 services:
   - type: web
-    name: proposalai-revenue-ops
-    runtime: docker
+    name: proposalai
+    runtime: python
     plan: free
     region: singapore
-    dockerfilePath: ./Dockerfile
-    dockerContext: .
-    dockerCommand: python -m revenue_ops render-service
+    buildCommand: ""
+    startCommand: python server.py
     healthCheckPath: /health
     autoDeployTrigger: commit
     envVars:
-      - key: PROPOSALAI_REVENUE_DATA_DIR
-        value: /app/revenue_ops_data
-      - key: PROPOSALAI_URL
-        value: https://proposalai-6qch.onrender.com
-      - key: PROPOSALAI_WEBHOOK_HOST
-        value: 0.0.0.0
-      - key: PROPOSALAI_WEBHOOK_PORT
-        value: 10000
-      - key: BREVO_PREFER_API
-        value: "true"
-      - key: EMAIL_DAILY_LIMIT
-        value: "40"
-      - key: EMAIL_MIN_DELAY_SECONDS
-        value: "120"
-      - key: EMAIL_MAX_DELAY_SECONDS
-        value: "300"
-      - key: EMAIL_BUSINESS_START_HOUR_IST
-        value: "9"
-      - key: EMAIL_BUSINESS_END_HOUR_IST
-        value: "18"
-      - key: EMAIL_FROM_NAME
-        value: Soubhagya Parida
-      - key: EMAIL_SIGNATURE
-        value: Soubhagya
-      - key: HUNTER_MONTHLY_SEARCH_LIMIT
-        value: "25"
-      - key: REDDIT_SUBREDDITS
-        value: forhire,freelance,slavelabour
-      - key: REDDIT_POSTS_PER_SUBREDDIT
-        value: "25"
-      - key: HUNTER_API_KEY
-        sync: false
-      - key: BREVO_EMAIL
-        sync: false
-      - key: BREVO_FROM_EMAIL
-        sync: false
-      - key: BREVO_SMTP_KEY
-        sync: false
-      - key: BREVO_API_KEY
-        sync: false
-      - key: BREVO_REPLY_TO_EMAIL
-        sync: false
-      - key: BREVO_WEBHOOK_SECRET
-        generateValue: true
-      - key: PROPOSALAI_DASHBOARD_SECRET
-        generateValue: true
-      - key: PROPOSALAI_PHYSICAL_ADDRESS
-        sync: false
-      - key: PROPOSALAI_REPORT_EMAIL
-        sync: false
-      - key: PROPOSALAI_AUTOMATION_STOP_DATE
-        value: "2026-05-30"
-      - key: GOOGLE_APPLICATION_CREDENTIALS
-        sync: false
-      - key: GOOGLE_SERVICE_ACCOUNT_JSON
-        sync: false
-      - key: PROPOSALAI_GOOGLE_SHEET_ID
-        sync: false
       - key: GITHUB_MODELS_TOKEN
         sync: false
-      - key: PROPOSALAI_GITHUB_MODELS_TOKEN
-        sync: false
-      - key: GITHUB_PAT
-        sync: false
+      - key: GITHUB_MODELS_MODEL
+        value: openai/gpt-4o-mini
