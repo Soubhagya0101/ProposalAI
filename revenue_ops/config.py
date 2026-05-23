@@ -44,7 +44,7 @@ class RevenueOpsConfig:
     email_from_name: str = "Soubhagya Parida"
     email_signature: str = "Soubhagya"
     physical_address: str | None = None
-    proposalai_url: str = "https://proposalai-revenue-ops.onrender.com"
+    proposalai_url: str = "https://proposalai-6qch.onrender.com"
     twilio_account_sid: str | None = None
     twilio_auth_token: str | None = None
     twilio_from_whatsapp: str | None = None
@@ -100,7 +100,7 @@ class RevenueOpsConfig:
             email_from_name=os.getenv("EMAIL_FROM_NAME", "Soubhagya Parida"),
             email_signature=os.getenv("EMAIL_SIGNATURE", "Soubhagya"),
             physical_address=clean_env("PROPOSALAI_PHYSICAL_ADDRESS"),
-            proposalai_url=os.getenv("PROPOSALAI_URL", "https://proposalai-revenue-ops.onrender.com"),
+            proposalai_url=os.getenv("PROPOSALAI_URL", "https://proposalai-6qch.onrender.com"),
             twilio_account_sid=clean_env("TWILIO_ACCOUNT_SID"),
             twilio_auth_token=clean_env("TWILIO_AUTH_TOKEN"),
             twilio_from_whatsapp=clean_env("TWILIO_FROM_WHATSAPP"),

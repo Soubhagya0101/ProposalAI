@@ -13,7 +13,7 @@ services:
       - key: PROPOSALAI_REVENUE_DATA_DIR
         value: /app/revenue_ops_data
       - key: PROPOSALAI_URL
-        value: https://proposalai-revenue-ops.onrender.com
+        value: https://proposalai-6qch.onrender.com
       - key: PROPOSALAI_WEBHOOK_HOST
         value: 0.0.0.0
       - key: PROPOSALAI_WEBHOOK_PORT
@@ -69,4 +69,8 @@ services:
       - key: PROPOSALAI_GOOGLE_SHEET_ID
         sync: false
       - key: GITHUB_MODELS_TOKEN
+        sync: false
+      - key: PROPOSALAI_GITHUB_MODELS_TOKEN
+        sync: false
+      - key: GITHUB_PAT
         sync: false

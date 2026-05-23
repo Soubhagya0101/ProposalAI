@@ -45,6 +45,10 @@ Do not commit `.env` or `revenue_ops_data/`.
 6. Select the `proposalai-revenue-ops` service.
 7. Keep the plan as **Free**.
 
+Important: do not deploy this as a **Static Site**. Static Sites can serve `public/index.html`, but they cannot run `/api/generate-proposal`. This project must run as the Docker web service defined in `render.yaml`.
+
+If `https://YOUR-RENDER-SERVICE.onrender.com/public/index.html` loads but `/health` or `/api/generate-proposal?test=1` returns 404, the deploy is still a Static Site or the wrong service. Create a Blueprint/Docker Web Service from this repo instead.
+
 The service command is:
 
 ```bash
@@ -68,6 +72,8 @@ PROPOSALAI_PHYSICAL_ADDRESS
 PROPOSALAI_REPORT_EMAIL
 GITHUB_MODELS_TOKEN
 ```
+
+Use `GITHUB_MODELS_TOKEN` for the GitHub Models PAT. The service also accepts `PROPOSALAI_GITHUB_MODELS_TOKEN`, `GITHUB_TOKEN`, or `GITHUB_PAT` if you already created one of those names in Render.
 
 Recommended for persistence:
 
@@ -107,6 +113,24 @@ The public ProposalAI app should load at:
 
 ```text
 https://YOUR-RENDER-SERVICE.onrender.com/
+```
+
+For your current Render service, use:
+
+```text
+https://proposalai-6qch.onrender.com/
+```
+
+The GitHub Models smoke test can be opened directly in the browser:
+
+```text
+https://YOUR-RENDER-SERVICE.onrender.com/api/generate-proposal?test=1
+```
+
+Expected:
+
+```json
+{"ok": true, "model": "openai/gpt-4o-mini", "response": "ProposalAI GitHub Models connection works."}
 ```
 
 ## Step 5: Open The Dashboard

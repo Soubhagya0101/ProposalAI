@@ -38,7 +38,7 @@ class RenderServiceHandler(BaseHTTPRequestHandler):
             self.send_header("Content-Length", "0")
             self.end_headers()
             return
-        if path in {"/", "/index.html"}:
+        if path in {"/", "/index.html", "/public/index.html"}:
             self._send_head_file(PUBLIC_DIR / "index.html", "text/html; charset=utf-8")
             return
         if path == "/ops":
@@ -55,7 +55,7 @@ class RenderServiceHandler(BaseHTTPRequestHandler):
         if path == "/health":
             self._send_json({"ok": True, "service": "proposalai-revenue-ops"})
             return
-        if path in {"/", "/index.html"}:
+        if path in {"/", "/index.html", "/public/index.html"}:
             self._send_file(PUBLIC_DIR / "index.html", "text/html; charset=utf-8")
             return
         if path == "/ops":
@@ -75,6 +75,13 @@ class RenderServiceHandler(BaseHTTPRequestHandler):
                 self.send_error(401, "Unauthorized")
                 return
             self._send_json(self._debug_payload())
+            return
+        if path == "/api/generate-proposal":
+            if (parse_qs(parsed.query).get("test") or [""])[0] == "1":
+                result = generate_proposal_response({}, test_mode=True)
+                self._send_json(result.payload, result.status)
+                return
+            self._send_json({"error": "Use POST for /api/generate-proposal."}, 405)
             return
         if path.startswith("/ops/static/"):
             if not self._dashboard_authorized(parsed.query):
@@ -222,6 +229,7 @@ class RenderServiceHandler(BaseHTTPRequestHandler):
                 "hunter_configured": bool(config.hunter_api_key),
                 "imap_enabled": config.imap_enabled,
                 "automation_stop_date": config.automation_stop_date or "",
+                "github_models_token_set": bool(_github_models_token_set()),
             },
             "counts": {
                 "leads": len(leads),
@@ -268,3 +276,7 @@ def _redact_event_detail(value: str) -> str:
     text = re.sub(r"\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b", "[email]", text, flags=re.IGNORECASE)
     text = re.sub(r"(api[_-]?key|smtp[_-]?key|password|secret|token)[^,}\s]*", r"\1=[redacted]", text, flags=re.IGNORECASE)
     return text[:220]
+
+
+def _github_models_token_set() -> bool:
+    return any(os.getenv(name, "").strip() for name in ("GITHUB_MODELS_TOKEN", "PROPOSALAI_GITHUB_MODELS_TOKEN", "GITHUB_TOKEN", "GITHUB_PAT"))

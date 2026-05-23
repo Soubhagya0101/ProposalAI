@@ -167,10 +167,59 @@ def _request_github_models(token: str, prompt: str, temperature: float = 0.7, ma
     except json.JSONDecodeError:
         return _error("GitHub Models returned invalid JSON.", 502)
 
-    proposal = data.get("choices", [{}])[0].get("message", {}).get("content", "") if isinstance(data, dict) else ""
+    proposal = _extract_proposal_text(data)
     if not isinstance(proposal, str) or not proposal.strip():
-        return _error("GitHub Models returned an empty proposal.", 502)
+        return _error(_empty_response_message(data), 502)
     return ProposalResult(200, {"proposal": proposal.strip()})
+
+
+def _extract_proposal_text(data: Any) -> str:
+    if not isinstance(data, dict):
+        return ""
+
+    choices = data.get("choices")
+    if isinstance(choices, list) and choices:
+        choice = choices[0] if isinstance(choices[0], dict) else {}
+        message = choice.get("message") if isinstance(choice, dict) else {}
+        if isinstance(message, dict):
+            content = message.get("content", "")
+            if isinstance(content, str):
+                return content
+            if isinstance(content, list):
+                chunks = []
+                for item in content:
+                    if isinstance(item, dict):
+                        text = item.get("text") or item.get("content")
+                        if isinstance(text, str):
+                            chunks.append(text)
+                    elif isinstance(item, str):
+                        chunks.append(item)
+                return "\n".join(chunks)
+        text = choice.get("text") if isinstance(choice, dict) else ""
+        if isinstance(text, str):
+            return text
+
+    output_text = data.get("output_text")
+    if isinstance(output_text, str):
+        return output_text
+    return ""
+
+
+def _empty_response_message(data: Any) -> str:
+    if not isinstance(data, dict):
+        return "GitHub Models returned an empty or unrecognized response."
+    choices = data.get("choices")
+    finish_reason = ""
+    if isinstance(choices, list) and choices and isinstance(choices[0], dict):
+        finish_reason = str(choices[0].get("finish_reason") or "")
+    response_id = str(data.get("id") or "")
+    details = []
+    if finish_reason:
+        details.append(f"finish_reason={finish_reason}")
+    if response_id:
+        details.append(f"response_id={response_id}")
+    suffix = f" ({', '.join(details)})" if details else ""
+    return f"GitHub Models returned an empty proposal{suffix}."
 
 
 def _normalize_profile(profile: Any) -> dict[str, Any] | None:
@@ -240,7 +289,17 @@ def _word_count(text: str) -> int:
 
 
 def _github_models_token() -> str:
-    return os.getenv("GITHUB_MODELS_TOKEN", "").strip() or os.getenv("GITHUB_TOKEN", "").strip()
+    try:
+        from .config import load_dotenv
+
+        load_dotenv()
+    except Exception:
+        pass
+    for name in ("GITHUB_MODELS_TOKEN", "PROPOSALAI_GITHUB_MODELS_TOKEN", "GITHUB_TOKEN", "GITHUB_PAT"):
+        value = os.getenv(name, "").strip()
+        if value:
+            return value
+    return ""
 
 
 def _error(message: str, status: int) -> ProposalResult:
