@@ -1,10 +1,8 @@
-node_modules/
-.netlify/
 .env
 .env.*
 !.env.example
+# Historical local data from the removed revenue automation.
 revenue_ops_data/
 __pycache__/
 *.py[cod]
-*$py.class
 .pytest_cache/

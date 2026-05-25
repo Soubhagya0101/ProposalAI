@@ -1,15 +1,14 @@
 services:
   - type: web
     name: proposalai
-    runtime: python
+    runtime: docker
     plan: free
     region: singapore
-    buildCommand: ""
-    startCommand: python server.py
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    dockerCommand: python server.py
     healthCheckPath: /health
     autoDeployTrigger: commit
     envVars:
       - key: GITHUB_MODELS_TOKEN
         sync: false
-      - key: GITHUB_MODELS_MODEL
-        value: openai/gpt-4o-mini

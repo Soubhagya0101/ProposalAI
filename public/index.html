@@ -7,17 +7,17 @@
   <link rel="icon" href="data:," />
   <style>
     :root {
-      --bg: #f8fafc;
-      --surface: #ffffff;
-      --text: #111827;
-      --muted: #64748b;
-      --line: #dbe3ef;
-      --soft: #f1f6ff;
+      --bg: #ffffff;
+      --ink: #101828;
+      --muted: #667085;
+      --line: #d8e0ee;
+      --soft: #f5f8ff;
+      --soft-blue: #edf4ff;
       --blue: #2563eb;
-      --blue-dark: #1d4ed8;
-      --danger: #b42318;
-      --success: #067647;
-      --shadow: 0 22px 55px rgba(15, 23, 42, 0.08);
+      --blue-strong: #1747b8;
+      --green: #067647;
+      --red: #b42318;
+      --shadow: 0 18px 45px rgba(16, 24, 40, 0.08);
       --radius: 8px;
     }
 
@@ -25,77 +25,79 @@
       box-sizing: border-box;
     }
 
+    html {
+      scroll-behavior: smooth;
+    }
+
     body {
       margin: 0;
+      min-height: 100vh;
       background: var(--bg);
-      color: var(--text);
+      color: var(--ink);
       font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       line-height: 1.5;
     }
 
     button,
     input,
-    textarea,
-    select {
+    select,
+    textarea {
       font: inherit;
     }
 
     button {
-      border: 0;
       cursor: pointer;
+      border: 0;
     }
 
     .page {
-      width: min(960px, calc(100% - 32px));
+      width: min(1120px, calc(100% - 32px));
       margin: 0 auto;
-      padding: 28px 0 48px;
+      padding: 24px 0 48px;
     }
 
     .topbar {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 16px;
-      margin-bottom: 28px;
+      gap: 18px;
+      min-height: 48px;
+      margin-bottom: 22px;
     }
 
     .brand {
       display: flex;
       align-items: center;
       gap: 12px;
+      min-width: 0;
     }
 
-    .mark {
-      width: 40px;
-      height: 40px;
+    .brand-mark {
+      width: 38px;
+      height: 38px;
       display: grid;
       place-items: center;
       border-radius: var(--radius);
       background: var(--blue);
-      color: #ffffff;
-      font-weight: 800;
-      box-shadow: 0 12px 28px rgba(37, 99, 235, 0.22);
+      color: white;
+      font-weight: 900;
+      box-shadow: 0 12px 26px rgba(37, 99, 235, 0.22);
     }
 
-    h1,
-    h2,
-    p {
-      margin: 0;
+    .brand-text {
+      display: grid;
+      gap: 0;
     }
 
-    h1 {
-      font-size: clamp(1.8rem, 4vw, 2.75rem);
-      line-height: 1.08;
+    .brand-name {
+      font-size: 1rem;
+      font-weight: 850;
       letter-spacing: 0;
     }
 
-    h2 {
-      font-size: 1.2rem;
-      line-height: 1.25;
-    }
-
-    .muted {
+    .brand-sub {
       color: var(--muted);
+      font-size: 0.84rem;
     }
 
     .screen {
@@ -106,29 +108,97 @@
       display: block;
     }
 
-    .card {
+    .setup-layout {
+      display: grid;
+      grid-template-columns: minmax(0, 0.86fr) minmax(420px, 1.14fr);
+      gap: 28px;
+      align-items: start;
+      padding-top: 16px;
+    }
+
+    .intro {
+      padding: 28px 4px 0;
+    }
+
+    h1,
+    h2,
+    h3,
+    p {
+      margin: 0;
+    }
+
+    h1 {
+      max-width: 620px;
+      font-size: clamp(2.45rem, 7vw, 4.55rem);
+      line-height: 0.96;
+      letter-spacing: 0;
+    }
+
+    h2 {
+      font-size: 1.22rem;
+      line-height: 1.25;
+    }
+
+    h3 {
+      font-size: 1rem;
+    }
+
+    .intro-copy {
+      margin-top: 20px;
+      max-width: 540px;
+      color: var(--muted);
+      font-size: 1.05rem;
+    }
+
+    .proof-list {
+      display: grid;
+      gap: 10px;
+      margin-top: 28px;
+      color: #344054;
+      font-size: 0.96rem;
+    }
+
+    .proof-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .proof-dot {
+      width: 8px;
+      height: 8px;
+      flex: 0 0 auto;
+      border-radius: 999px;
+      background: var(--blue);
+    }
+
+    .panel {
       border: 1px solid var(--line);
       border-radius: var(--radius);
-      background: var(--surface);
+      background: #ffffff;
       box-shadow: var(--shadow);
     }
 
-    .card-header {
+    .panel-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
       padding: 22px 24px;
       border-bottom: 1px solid var(--line);
     }
 
-    .card-header p {
-      margin-top: 6px;
+    .panel-header p {
+      margin-top: 5px;
       color: var(--muted);
-      font-size: 0.95rem;
+      font-size: 0.92rem;
     }
 
-    .card-body {
+    .panel-body {
       padding: 24px;
     }
 
-    .profile-form {
+    .form-grid {
       display: grid;
       gap: 16px;
     }
@@ -142,70 +212,68 @@
     label {
       display: grid;
       gap: 7px;
-      font-size: 0.9rem;
-      font-weight: 700;
+      color: #263244;
+      font-size: 0.88rem;
+      font-weight: 760;
     }
 
     input,
-    textarea,
-    select {
+    select,
+    textarea {
       width: 100%;
       min-width: 0;
       border: 1px solid var(--line);
       border-radius: var(--radius);
       background: #ffffff;
-      color: var(--text);
-      padding: 12px 13px;
+      color: var(--ink);
       outline: none;
-      transition: border-color 160ms ease, box-shadow 160ms ease;
+      padding: 12px 13px;
+      transition: border-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
     }
 
     textarea {
-      min-height: 170px;
       resize: vertical;
     }
 
     input:focus,
-    textarea:focus,
-    select:focus {
+    select:focus,
+    textarea:focus {
       border-color: var(--blue);
       box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12);
     }
 
-    .helper-row {
-      display: flex;
-      justify-content: space-between;
-      gap: 12px;
-      color: var(--muted);
-      font-size: 0.84rem;
-      font-weight: 500;
+    .rate-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
     }
 
-    .actions {
+    .button-row {
       display: flex;
       align-items: center;
       flex-wrap: wrap;
       gap: 10px;
-      margin-top: 6px;
+      margin-top: 4px;
     }
 
     .btn {
+      min-height: 42px;
       display: inline-flex;
       align-items: center;
       justify-content: center;
       gap: 8px;
-      min-height: 42px;
-      padding: 10px 16px;
       border-radius: var(--radius);
+      padding: 10px 16px;
       background: var(--blue);
       color: #ffffff;
-      font-weight: 800;
+      font-size: 0.93rem;
+      font-weight: 820;
       box-shadow: 0 12px 24px rgba(37, 99, 235, 0.2);
       transition: transform 160ms ease, background-color 160ms ease, opacity 160ms ease;
     }
 
     .btn:hover {
-      background: var(--blue-dark);
+      background: var(--blue-strong);
       transform: translateY(-1px);
     }
 
@@ -217,75 +285,174 @@
     }
 
     .btn-secondary {
-      background: #eaf1ff;
-      color: var(--blue-dark);
+      background: var(--soft-blue);
+      color: var(--blue-strong);
       box-shadow: none;
     }
 
     .btn-secondary:hover {
-      background: #dbe8ff;
+      background: #dfeaff;
     }
 
     .status {
       min-height: 22px;
       color: var(--muted);
-      font-size: 0.88rem;
+      font-size: 0.9rem;
     }
 
     .status.success {
-      color: var(--success);
+      color: var(--green);
     }
 
     .status.error {
-      color: var(--danger);
+      color: var(--red);
     }
 
-    .main-shell {
+    .app-layout {
       display: grid;
+      grid-template-columns: minmax(0, 0.92fr) minmax(420px, 1.08fr);
       gap: 20px;
+      align-items: start;
     }
 
-    .job-textarea {
-      min-height: 245px;
+    .workspace-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      margin-bottom: 18px;
     }
 
-    .output {
-      min-height: 280px;
-      white-space: pre-wrap;
+    .workspace-title p {
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    .job-box {
+      min-height: 335px;
+    }
+
+    .helper-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 0.84rem;
+    }
+
+    .style-picker {
+      display: grid;
+      gap: 9px;
+      margin: 18px 0 16px;
+      padding: 0;
+      border: 0;
+    }
+
+    .style-picker legend {
+      margin-bottom: 9px;
+      padding: 0;
+      color: #263244;
+      font-size: 0.88rem;
+      font-weight: 760;
+    }
+
+    .style-options {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      padding: 4px;
       border: 1px solid var(--line);
       border-radius: var(--radius);
       background: var(--soft);
-      padding: 18px;
-      color: var(--text);
+    }
+
+    .style-choice {
+      position: relative;
+      display: grid;
+      gap: 2px;
+      min-height: 62px;
+      padding: 10px 12px;
+      border-radius: 6px;
+      color: var(--muted);
+      cursor: pointer;
+      font-weight: 500;
+      transition: background-color 160ms ease, box-shadow 160ms ease, color 160ms ease;
+    }
+
+    .style-choice:has(input:checked) {
+      background: #ffffff;
+      color: var(--ink);
+      box-shadow: 0 1px 4px rgba(16, 24, 40, 0.1);
+    }
+
+    .style-choice input {
+      position: absolute;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .style-title {
+      color: inherit;
+      font-size: 0.92rem;
+      font-weight: 800;
+    }
+
+    .style-description {
+      color: var(--muted);
+      font-size: 0.78rem;
+      line-height: 1.4;
+    }
+
+    .output-box {
+      min-height: 458px;
+      display: grid;
+      grid-template-rows: auto 1fr;
+    }
+
+    .output-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 16px 18px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .output-meta {
+      color: var(--muted);
+      font-size: 0.88rem;
+    }
+
+    .proposal {
+      min-height: 360px;
+      padding: 22px;
+      white-space: pre-wrap;
+      color: #172033;
+      background: linear-gradient(180deg, #f7faff 0%, #ffffff 100%);
+      border-radius: 0 0 var(--radius) var(--radius);
       font-size: 1rem;
     }
 
-    .output.empty {
+    .proposal.empty {
       display: grid;
       place-items: center;
-      text-align: center;
       color: var(--muted);
+      text-align: center;
     }
 
-    .output-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 14px;
-      margin-bottom: 14px;
+    .hidden {
+      display: none !important;
     }
 
     .spinner {
       width: 16px;
       height: 16px;
-      border: 2px solid rgba(255, 255, 255, 0.4);
+      border-radius: 999px;
+      border: 2px solid rgba(255, 255, 255, 0.45);
       border-top-color: #ffffff;
-      border-radius: 50%;
       animation: spin 800ms linear infinite;
-    }
-
-    .hidden {
-      display: none !important;
     }
 
     @keyframes spin {
@@ -294,26 +461,53 @@
       }
     }
 
-    @media (max-width: 680px) {
+    @media (max-width: 900px) {
+      .setup-layout,
+      .app-layout {
+        grid-template-columns: 1fr;
+      }
+
+      .intro {
+        padding-top: 4px;
+      }
+
+      .job-box,
+      .output-box {
+        min-height: auto;
+      }
+    }
+
+    @media (max-width: 640px) {
       .page {
-        width: min(100% - 22px, 960px);
-        padding-top: 18px;
+        width: min(100% - 24px, 1120px);
+        padding-top: 16px;
       }
 
       .topbar,
+      .workspace-title,
+      .panel-header,
+      .output-toolbar {
+        align-items: stretch;
+        flex-direction: column;
+      }
+
       .grid-2,
-      .output-header {
-        display: grid;
+      .rate-row,
+      .style-options {
+        grid-template-columns: 1fr;
       }
 
-      .card-header,
-      .card-body {
-        padding-left: 16px;
-        padding-right: 16px;
+      .panel-body,
+      .panel-header {
+        padding: 18px;
       }
 
-      .btn {
-        width: 100%;
+      h1 {
+        font-size: clamp(2.25rem, 14vw, 3.4rem);
+      }
+
+      .proposal {
+        min-height: 280px;
       }
     }
   </style>
@@ -321,134 +515,171 @@
 <body>
   <main class="page">
     <header class="topbar">
-      <div class="brand">
-        <div class="mark" aria-hidden="true">P</div>
-        <div>
-          <h1>ProposalAI</h1>
-          <p class="muted">Freelance proposals generated from your saved profile.</p>
+      <div class="brand" aria-label="ProposalAI">
+        <div class="brand-mark">P</div>
+        <div class="brand-text">
+          <div class="brand-name">ProposalAI</div>
+          <div class="brand-sub">Freelance proposals in your voice</div>
         </div>
       </div>
       <button class="btn btn-secondary hidden" id="editProfileBtn" type="button">Edit Profile</button>
     </header>
 
-    <section id="profileScreen" class="screen" aria-labelledby="profileTitle">
-      <div class="card">
-        <div class="card-header">
-          <h2 id="profileTitle">Set Up Your Profile</h2>
-          <p>This is shown only until your profile is saved. Your details stay in this browser.</p>
+    <section class="screen" id="profileScreen">
+      <div class="setup-layout">
+        <div class="intro">
+          <h1>Turn any job post into a proposal you can send.</h1>
+          <p class="intro-copy">Save your freelancer profile once. ProposalAI uses it to draft client-first proposals with your voice and most relevant proof.</p>
+          <div class="proof-list" aria-label="ProposalAI workflow">
+            <div class="proof-item"><span class="proof-dot"></span><span>Profile stays private in this browser.</span></div>
+            <div class="proof-item"><span class="proof-dot"></span><span>No API key field for users.</span></div>
+            <div class="proof-item"><span class="proof-dot"></span><span>Generated through the secure Render API.</span></div>
+          </div>
         </div>
-        <div class="card-body">
-          <form id="profileForm" class="profile-form">
-            <label>
-              Full name
-              <input id="fullName" name="fullName" type="text" autocomplete="name" placeholder="Alex Morgan" required />
-            </label>
 
-            <label>
-              Freelance niche
-              <input id="niche" name="niche" type="text" placeholder="Copywriter, graphic designer, Webflow developer" required />
-            </label>
+        <form class="panel form-grid" id="profileForm">
+          <div class="panel-header">
+            <div>
+              <h2>Set up your profile</h2>
+              <p>This is saved locally and loaded silently next time.</p>
+            </div>
+          </div>
+          <div class="panel-body form-grid">
+            <div class="grid-2">
+              <label>
+                Full name
+                <input id="fullName" autocomplete="name" required placeholder="Soubhagya Parida" />
+              </label>
+              <label>
+                Freelance niche
+                <input id="niche" required placeholder="Web developer" />
+              </label>
+            </div>
 
             <div class="grid-2">
               <label>
                 Years of experience
-                <input id="experience" name="experience" type="number" min="0" step="1" placeholder="5" required />
+                <input id="experience" inputmode="numeric" required placeholder="3" />
               </label>
-
               <label>
                 Preferred tone
-                <select id="tone" name="tone" required>
-                  <option value="Professional">Professional</option>
-                  <option value="Friendly">Friendly</option>
-                  <option value="Confident">Confident</option>
+                <select id="tone" required>
+                  <option>Professional</option>
+                  <option>Friendly</option>
+                  <option>Confident</option>
                 </select>
               </label>
             </div>
 
-            <div class="grid-2">
-              <label>
-                Top skill 1
-                <input id="skill1" name="skill1" type="text" placeholder="Landing page copy" required />
-              </label>
-
-              <label>
-                Top skill 2
-                <input id="skill2" name="skill2" type="text" placeholder="Conversion strategy" required />
-              </label>
-            </div>
-
             <label>
-              Top skill 3
-              <input id="skill3" name="skill3" type="text" placeholder="Email sequences" required />
+              Top 3 skills
+              <div class="grid-2">
+                <input id="skill1" aria-label="Top skill 1" required placeholder="Landing pages" />
+                <input id="skill2" aria-label="Top skill 2" required placeholder="Conversion copy" />
+              </div>
+              <input id="skill3" aria-label="Top skill 3" required placeholder="Frontend development" />
             </label>
 
             <label>
               One past win or success story
-              <textarea id="pastWin" name="pastWin" placeholder="Helped a SaaS client lift demo bookings by 38% in six weeks." required></textarea>
+              <textarea id="pastWin" rows="4" required placeholder="Helped a service business turn a slow website into a faster page that generated more consultation requests."></textarea>
             </label>
 
             <label>
               Hourly rate or project rate
-              <input id="rate" name="rate" type="text" placeholder="$75/hour or projects from $1,500" required />
+              <input id="rate" required placeholder="$25/hour or $500/project" />
             </label>
 
-            <div class="actions">
+            <div class="button-row">
               <button class="btn" type="submit">Save Profile</button>
-              <span id="profileStatus" class="status" role="status"></span>
+              <span class="status" id="profileStatus" role="status"></span>
             </div>
-          </form>
-        </div>
+          </div>
+        </form>
       </div>
     </section>
 
-    <section id="mainScreen" class="screen" aria-labelledby="jobTitle">
-      <div class="main-shell">
-        <section class="card">
-          <div class="card-header">
-            <h2 id="jobTitle">Job Description</h2>
-            <p>Paste the client post, brief, or RFP. Generation unlocks after 50 characters.</p>
+    <section class="screen" id="appScreen">
+      <div class="workspace-title">
+        <div>
+          <h1>Draft a proposal</h1>
+          <p>Paste a job description and get a specific first draft in under 30 seconds.</p>
+        </div>
+      </div>
+
+      <div class="app-layout">
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h2>Job description</h2>
+              <p>Use the full client brief for the most specific result.</p>
+            </div>
           </div>
-          <div class="card-body">
-            <label>
-              Job description
-              <textarea id="jobDescription" class="job-textarea" placeholder="Paste the job description here..." required></textarea>
-            </label>
+          <div class="panel-body">
+            <textarea class="job-box" id="jobDescription" placeholder="Paste the job description here..."></textarea>
             <div class="helper-row">
               <span id="charCount">0 characters</span>
               <span>Minimum 50 characters</span>
             </div>
-            <div class="actions">
+            <fieldset class="style-picker">
+              <legend>Proposal Style: Quick / Detailed</legend>
+              <div class="style-options">
+                <label class="style-choice">
+                  <input type="radio" name="proposalStyle" value="quick" checked />
+                  <span class="style-title">Quick</span>
+                  <span class="style-description">50-80 words. Fast and direct.</span>
+                </label>
+                <label class="style-choice">
+                  <input type="radio" name="proposalStyle" value="detailed" />
+                  <span class="style-title">Detailed</span>
+                  <span class="style-description">120-150 words. Adds the approach.</span>
+                </label>
+              </div>
+            </fieldset>
+            <div class="button-row">
               <button class="btn" id="generateBtn" type="button" disabled>
                 <span id="generateLabel">Generate Proposal</span>
               </button>
-              <button class="btn btn-secondary" id="clearJob" type="button">Clear Job</button>
-              <span id="generateStatus" class="status" role="status"></span>
+              <span class="status" id="generateStatus" role="status"></span>
             </div>
           </div>
         </section>
 
-        <section class="card" aria-labelledby="outputTitle">
-          <div class="card-header">
-            <h2 id="outputTitle">Ready-to-Send Proposal</h2>
-            <p>Generated with GitHub Models using your saved profile.</p>
-          </div>
-          <div class="card-body">
-            <div class="output-header">
-              <span id="outputMeta" class="muted">No proposal generated yet.</span>
-              <button class="btn btn-secondary hidden" id="copyBtn" type="button">Copy to Clipboard</button>
+        <section class="panel output-box">
+          <div class="output-toolbar">
+            <div>
+              <h2>Ready-to-send draft</h2>
+              <div class="output-meta" id="outputMeta">No proposal generated yet.</div>
             </div>
-            <div id="proposalOutput" class="output empty">Your proposal will appear here after generation.</div>
+            <button class="btn btn-secondary hidden" id="copyBtn" type="button">Copy</button>
           </div>
+          <div class="proposal empty" id="proposalOutput">Your proposal will appear here.</div>
         </section>
       </div>
     </section>
   </main>
 
   <script>
-    const PROFILE_KEY = "proposalai.profile.v3";
-    const LEGACY_PROFILE_KEYS = ["proposalai.profile.v2", "proposalai.profile.v1"];
-    const API_PATH = "/api/generate-proposal";
+    const PROFILE_KEY = "proposalai.profile.v4";
+    const LEGACY_KEYS = ["proposalai.profile.v3", "proposalai.profile.v2", "proposalai.profile.v1"];
     const MIN_JOB_CHARS = 50;
+    const API_PATH = "/api/generate-proposal";
+    const RETRY_MESSAGE = "Taking longer than usual - please try again.";
+
+    const profileScreen = document.getElementById("profileScreen");
+    const appScreen = document.getElementById("appScreen");
+    const editProfileBtn = document.getElementById("editProfileBtn");
+    const profileForm = document.getElementById("profileForm");
+    const profileStatus = document.getElementById("profileStatus");
+    const generateBtn = document.getElementById("generateBtn");
+    const generateLabel = document.getElementById("generateLabel");
+    const generateStatus = document.getElementById("generateStatus");
+    const jobDescription = document.getElementById("jobDescription");
+    const charCount = document.getElementById("charCount");
+    const proposalOutput = document.getElementById("proposalOutput");
+    const outputMeta = document.getElementById("outputMeta");
+    const copyBtn = document.getElementById("copyBtn");
+    const styleInputs = document.querySelectorAll('input[name="proposalStyle"]');
 
     const fields = {
       fullName: document.getElementById("fullName"),
@@ -459,37 +690,22 @@
       skill2: document.getElementById("skill2"),
       skill3: document.getElementById("skill3"),
       pastWin: document.getElementById("pastWin"),
-      rate: document.getElementById("rate"),
-      jobDescription: document.getElementById("jobDescription")
+      rate: document.getElementById("rate")
     };
 
-    const profileScreen = document.getElementById("profileScreen");
-    const mainScreen = document.getElementById("mainScreen");
-    const profileForm = document.getElementById("profileForm");
-    const editProfileBtn = document.getElementById("editProfileBtn");
-    const profileStatus = document.getElementById("profileStatus");
-    const generateStatus = document.getElementById("generateStatus");
-    const generateBtn = document.getElementById("generateBtn");
-    const generateLabel = document.getElementById("generateLabel");
-    const clearJobBtn = document.getElementById("clearJob");
-    const copyBtn = document.getElementById("copyBtn");
-    const proposalOutput = document.getElementById("proposalOutput");
-    const outputMeta = document.getElementById("outputMeta");
-    const charCount = document.getElementById("charCount");
+    function showScreen(name) {
+      const isProfile = name === "profile";
+      profileScreen.classList.toggle("active", isProfile);
+      appScreen.classList.toggle("active", !isProfile);
+      editProfileBtn.classList.toggle("hidden", isProfile);
+    }
 
     function setStatus(element, message, type = "") {
       element.textContent = message;
       element.className = `status ${type}`.trim();
     }
 
-    function showScreen(screen) {
-      const isProfile = screen === "profile";
-      profileScreen.classList.toggle("active", isProfile);
-      mainScreen.classList.toggle("active", !isProfile);
-      editProfileBtn.classList.toggle("hidden", isProfile);
-    }
-
-    function getProfile() {
+    function readProfile() {
       return {
         fullName: fields.fullName.value.trim(),
         niche: fields.niche.value.trim(),
@@ -501,83 +717,53 @@
       };
     }
 
-    function validateProfile(profile) {
+    function missingProfileFields(profile) {
       const missing = [];
       if (!profile.fullName) missing.push("full name");
-      if (!profile.niche) missing.push("freelance niche");
-      if (!profile.experience) missing.push("years of experience");
+      if (!profile.niche) missing.push("niche");
+      if (!profile.experience) missing.push("experience");
       if (profile.skills.some((skill) => !skill)) missing.push("top 3 skills");
       if (!profile.pastWin) missing.push("past win");
       if (!profile.rate) missing.push("rate");
       return missing;
     }
 
-    function writeProfileToForm(profile) {
+    function fillProfile(profile) {
       fields.fullName.value = profile.fullName || "";
       fields.niche.value = profile.niche || "";
       fields.experience.value = profile.experience || "";
       fields.tone.value = profile.tone || "Professional";
-      fields.skill1.value = profile.skills?.[0] || "";
-      fields.skill2.value = profile.skills?.[1] || "";
-      fields.skill3.value = profile.skills?.[2] || "";
+      fields.skill1.value = profile.skills?.[0] || profile.skill1 || "";
+      fields.skill2.value = profile.skills?.[1] || profile.skill2 || "";
+      fields.skill3.value = profile.skills?.[2] || profile.skill3 || "";
       fields.pastWin.value = profile.pastWin || "";
       fields.rate.value = profile.rate || "";
     }
 
-    function loadSavedProfile() {
-      const keys = [PROFILE_KEY, ...LEGACY_PROFILE_KEYS];
-
+    function loadProfile() {
+      const keys = [PROFILE_KEY, ...LEGACY_KEYS];
       for (const key of keys) {
-        const raw = localStorage.getItem(key);
-        if (!raw) continue;
-
         try {
-          const profile = JSON.parse(raw);
-          if (validateProfile(profile).length === 0) {
+          const saved = localStorage.getItem(key);
+          if (!saved) continue;
+          const profile = JSON.parse(saved);
+          if (!missingProfileFields(profile).length) {
             localStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
-            writeProfileToForm(profile);
             return profile;
           }
         } catch {
           localStorage.removeItem(key);
         }
       }
-
       return null;
     }
 
-    function saveProfile() {
-      const profile = getProfile();
-      const missing = validateProfile(profile);
-
-      if (missing.length) {
-        setStatus(profileStatus, `Complete: ${missing.join(", ")}.`, "error");
-        return false;
-      }
-
+    function saveProfile(profile) {
       localStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
-      setStatus(profileStatus, "Profile saved. Opening the app...", "success");
-
-      window.setTimeout(() => {
-        setStatus(profileStatus, "");
-        showScreen("main");
-        fields.jobDescription.focus();
-      }, 650);
-
-      return true;
     }
 
-    function setGenerating(isGenerating) {
-      generateBtn.disabled = isGenerating || fields.jobDescription.value.trim().length < MIN_JOB_CHARS;
-      generateLabel.innerHTML = isGenerating ? '<span class="spinner" aria-hidden="true"></span> Generating...' : "Generate Proposal";
-    }
-
-    function wordCount(text) {
-      return text.trim().split(/\s+/).filter(Boolean).length;
-    }
-
-    function updateJobCount() {
-      const count = fields.jobDescription.value.trim().length;
+    function updateJobState() {
+      const count = jobDescription.value.trim().length;
       charCount.textContent = `${count} character${count === 1 ? "" : "s"}`;
       generateBtn.disabled = count < MIN_JOB_CHARS;
       if (count >= MIN_JOB_CHARS && generateStatus.textContent === "Add at least 50 characters.") {
@@ -585,71 +771,81 @@
       }
     }
 
-    async function generateProposal() {
-      const profile = getProfile();
-      const jobDescription = fields.jobDescription.value.trim();
+    function setGenerating(isGenerating) {
+      generateBtn.disabled = isGenerating || jobDescription.value.trim().length < MIN_JOB_CHARS;
+      generateLabel.innerHTML = isGenerating ? '<span class="spinner" aria-hidden="true"></span> Generating...' : "Generate Proposal";
+    }
 
-      if (validateProfile(profile).length) {
+    function wordCount(text) {
+      return text.trim().split(/\s+/).filter(Boolean).length;
+    }
+
+    function selectedStyle() {
+      return document.querySelector('input[name="proposalStyle"]:checked')?.value || "quick";
+    }
+
+    async function generateProposal() {
+      const profile = loadProfile();
+      const job = jobDescription.value.trim();
+
+      if (!profile) {
         showScreen("profile");
         setStatus(profileStatus, "Save your profile before generating.", "error");
         return;
       }
-
-      if (jobDescription.length < MIN_JOB_CHARS) {
+      if (job.length < MIN_JOB_CHARS) {
         setStatus(generateStatus, "Add at least 50 characters.", "error");
-        fields.jobDescription.focus();
         return;
       }
-
       if (window.location.protocol === "file:") {
-        setStatus(generateStatus, "Generation works from the hosted app or local server, not from a direct file open.", "error");
+        setStatus(generateStatus, "Open the Render website or run the local server first.", "error");
         return;
       }
 
       setGenerating(true);
       setStatus(generateStatus, "Writing proposal...");
-      proposalOutput.classList.remove("empty");
+      proposalOutput.className = "proposal";
       proposalOutput.textContent = "Generating your proposal...";
-      copyBtn.classList.add("hidden");
       outputMeta.textContent = "Working...";
+      copyBtn.classList.add("hidden");
 
       try {
         const response = await fetch(API_PATH, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ profile, jobDescription })
+          body: JSON.stringify({ profile, jobDescription: job, style: selectedStyle() })
         });
-
-        const responseText = await response.text();
+        const raw = await response.text();
         let data = {};
-
-        if (responseText.trim()) {
+        if (raw.trim()) {
           try {
-            data = JSON.parse(responseText);
+            data = JSON.parse(raw);
           } catch {
-            throw new Error(`Server returned non-JSON response (${response.status}): ${responseText.slice(0, 240)}`);
+            throw new Error(`Server returned non-JSON response (${response.status}): ${raw.slice(0, 220)}`);
           }
         }
-
         if (!response.ok) {
-          throw new Error(data?.error || responseText || `Request failed with HTTP ${response.status}.`);
+          if (data.code === "PROFILE_MISMATCH") {
+            throw new Error(data.error);
+          }
+          throw new Error(RETRY_MESSAGE);
         }
-
-        const proposal = data?.proposal?.trim();
+        const proposal = String(data.proposal || "").trim();
         if (!proposal) {
-          throw new Error("GitHub Models returned an empty proposal.");
+          throw new Error(RETRY_MESSAGE);
         }
-
         proposalOutput.textContent = proposal;
-        proposalOutput.classList.remove("empty");
+        proposalOutput.className = "proposal";
+        const styleLabel = selectedStyle() === "detailed" ? "Detailed" : "Quick";
+        outputMeta.textContent = `${styleLabel} - ${data.wordCount || wordCount(proposal)} words. Ready to copy.`;
         copyBtn.classList.remove("hidden");
-        outputMeta.textContent = `${wordCount(proposal)} words. Ready to copy.`;
         setStatus(generateStatus, "Proposal generated.", "success");
       } catch (error) {
-        proposalOutput.classList.add("empty");
-        proposalOutput.textContent = "The proposal could not be generated. Try again in a moment.";
+        proposalOutput.className = "proposal empty";
+        proposalOutput.textContent = "The proposal could not be generated.";
         outputMeta.textContent = "No proposal generated.";
-        setStatus(generateStatus, error.message || "Something went wrong.", "error");
+        const message = String(error.message || "");
+        setStatus(generateStatus, message.startsWith("Profile mismatch:") ? message : RETRY_MESSAGE, "error");
       } finally {
         setGenerating(false);
       }
@@ -658,7 +854,6 @@
     async function copyProposal() {
       const text = proposalOutput.textContent.trim();
       if (!text || proposalOutput.classList.contains("empty")) return;
-
       try {
         await navigator.clipboard.writeText(text);
       } catch {
@@ -671,35 +866,52 @@
         document.execCommand("copy");
         temp.remove();
       }
-
-      outputMeta.textContent = "Copied to clipboard.";
-      window.setTimeout(() => {
-        outputMeta.textContent = `${wordCount(text)} words. Ready to copy.`;
-      }, 2200);
+      outputMeta.textContent = `${wordCount(text)} words. Copied.`;
     }
 
     profileForm.addEventListener("submit", (event) => {
       event.preventDefault();
-      saveProfile();
+      const profile = readProfile();
+      const missing = missingProfileFields(profile);
+      if (missing.length) {
+        setStatus(profileStatus, `Complete: ${missing.join(", ")}.`, "error");
+        return;
+      }
+      saveProfile(profile);
+      setStatus(profileStatus, "Profile saved.", "success");
+      window.setTimeout(() => {
+        setStatus(profileStatus, "");
+        showScreen("app");
+        setStatus(generateStatus, "Profile saved.", "success");
+        window.setTimeout(() => {
+          if (generateStatus.textContent === "Profile saved.") {
+            setStatus(generateStatus, "");
+          }
+        }, 2500);
+        jobDescription.focus();
+      }, 550);
     });
 
     editProfileBtn.addEventListener("click", () => {
-      setStatus(profileStatus, "");
+      const profile = loadProfile();
+      if (profile) fillProfile(profile);
       showScreen("profile");
+      fields.fullName.focus();
     });
 
-    fields.jobDescription.addEventListener("input", updateJobCount);
+    jobDescription.addEventListener("input", updateJobState);
+    styleInputs.forEach((input) => input.addEventListener("change", () => setStatus(generateStatus, "")));
     generateBtn.addEventListener("click", generateProposal);
     copyBtn.addEventListener("click", copyProposal);
-    clearJobBtn.addEventListener("click", () => {
-      fields.jobDescription.value = "";
-      updateJobCount();
-      fields.jobDescription.focus();
-    });
 
-    const savedProfile = loadSavedProfile();
-    showScreen(savedProfile ? "main" : "profile");
-    updateJobCount();
+    const savedProfile = loadProfile();
+    if (savedProfile) {
+      fillProfile(savedProfile);
+      showScreen("app");
+    } else {
+      showScreen("profile");
+    }
+    updateJobState();
   </script>
 </body>
 </html>
