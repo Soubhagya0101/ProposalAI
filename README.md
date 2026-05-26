@@ -4,11 +4,14 @@ ProposalAI is a simple web app for freelancers. A user saves their profile once,
 
 This repo is now website-only:
 
+- no email automation
 - no lead scraping
+- no Brevo
 - no Hunter
+- no scheduler
 - no Netlify functions
 
-It has one narrow feedback workflow: users can rate a generated proposal, responses can be stored in Google Sheets, and a daily feedback summary can be emailed through the Brevo HTTPS API. It does not send outreach emails.
+It has one narrow feedback workflow: users can rate a generated proposal and responses can be stored in Google Sheets.
 
 ## Runtime
 
@@ -37,7 +40,7 @@ After a proposal is generated, the user can select `This sounds human`, `Still s
 
 The app stores only the selection, optional note, proposal style, word count, freelance niche, and detected job category. It does not store the job description or the generated proposal.
 
-For local development with no feedback environment variables, responses are appended to the ignored file `feedback_data/feedback.jsonl`. For Render deployment, configure Google Sheets storage: Render free web services lose local files when they spin down, restart, or redeploy.
+For local development, set `ALLOW_LOCAL_FEEDBACK_LOG=true` to append responses to the ignored file `feedback_data/feedback.jsonl`. In Render, feedback requires Google Sheets configuration rather than silently accepting responses into temporary storage.
 
 ## Local Run
 
@@ -46,6 +49,7 @@ Create `.env` locally:
 ```text
 GITHUB_MODELS_TOKEN=your-github-models-token
 PORT=10000
+ALLOW_LOCAL_FEEDBACK_LOG=true
 ```
 
 Start the app:
@@ -76,15 +80,11 @@ Proposal generation requires:
 GITHUB_MODELS_TOKEN
 ```
 
-To retain feedback and send the daily feedback report, also configure:
+To retain feedback in Google Sheets, also configure:
 
 ```text
 PROPOSALAI_FEEDBACK_SHEET_ID
 GOOGLE_SERVICE_ACCOUNT_JSON
-FEEDBACK_SUMMARY_SECRET
-BREVO_API_KEY
-BREVO_FROM_EMAIL
-PROPOSALAI_REPORT_EMAIL
 ```
 
 Optional values:
@@ -92,19 +92,9 @@ Optional values:
 ```text
 PROPOSALAI_FEEDBACK_SHEET_RANGE=Feedback!A:I
 PROPOSALAI_FEEDBACK_HEADER_RANGE=Feedback!A1:I1
-BREVO_REPLY_TO_EMAIL
 ```
 
 Create a `Feedback` tab and share the spreadsheet with the `client_email` in the Google service-account JSON. The app creates its column headers on the first feedback response.
-
-Daily summary email uses Brevo's HTTPS transactional email API, not SMTP. Render free web services block outbound SMTP ports, including port `587`.
-
-The included GitHub Actions workflow requests a summary at `20:00 IST` each day. Add these secrets to the private repository:
-
-```text
-PROPOSALAI_RENDER_URL=https://YOUR-SERVICE.onrender.com
-FEEDBACK_SUMMARY_SECRET=the-same-secret-set-on-render
-```
 
 Health check:
 

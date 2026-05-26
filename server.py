@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import hmac
 import mimetypes
 import os
 import re
@@ -9,7 +8,6 @@ import threading
 import urllib.error
 import urllib.request
 import uuid
-from collections import Counter
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -24,7 +22,6 @@ GITHUB_MODELS_URL = "https://models.github.ai/inference/chat/completions"
 MODEL_ID = "openai/gpt-4o-mini"
 USER_RETRY_MESSAGE = "Taking longer than usual - please try again."
 IST = timezone(timedelta(hours=5, minutes=30))
-BREVO_API_URL = "https://api.brevo.com/v3/smtp/email"
 FEEDBACK_TYPES = {
     "human": "This sounds human",
     "robotic": "Still sounds robotic",
@@ -239,7 +236,7 @@ class ProposalAIHandler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:
         path = unquote(urlparse(self.path).path)
-        if path not in {"/api/generate-proposal", "/api/feedback", "/api/feedback-summary/send"}:
+        if path not in {"/api/generate-proposal", "/api/feedback"}:
             self.send_error(404, "Not found")
             return
 
@@ -249,12 +246,8 @@ class ProposalAIHandler(BaseHTTPRequestHandler):
 
         if path == "/api/generate-proposal":
             result = generate_proposal(payload)
-        elif path == "/api/feedback":
-            result = save_feedback(payload)
-        elif self._has_summary_access():
-            result = send_feedback_summary(payload)
         else:
-            result = error("Not authorized.", 401)
+            result = save_feedback(payload)
         self._send_json(result.payload, result.status)
 
     def log_message(self, format: str, *args: object) -> None:
@@ -272,13 +265,6 @@ class ProposalAIHandler(BaseHTTPRequestHandler):
             self._send_json({"error": "Request body must be a JSON object."}, 400)
             return None
         return payload
-
-    def _has_summary_access(self) -> bool:
-        load_dotenv()
-        expected = os.getenv("FEEDBACK_SUMMARY_SECRET", "").strip()
-        header = self.headers.get("Authorization", "")
-        supplied = header.removeprefix("Bearer ").strip()
-        return bool(expected and supplied and hmac.compare_digest(expected, supplied))
 
     def _send_empty(self, status: int, content_type: str) -> None:
         self.send_response(status)
@@ -481,12 +467,15 @@ def append_feedback(record: dict[str, Any]) -> str:
         append_feedback_to_google_sheet(record)
         return "google_sheet"
 
+    if os.getenv("ALLOW_LOCAL_FEEDBACK_LOG", "").strip().lower() not in {"1", "true", "yes"}:
+        raise RuntimeError("Google Sheets feedback storage is not configured")
+
     path = feedback_log_path()
     with FEEDBACK_LOCK:
         path.parent.mkdir(parents=True, exist_ok=True)
         with path.open("a", encoding="utf-8") as output:
             output.write(json.dumps(record, ensure_ascii=False) + "\n")
-    print("[ProposalAI] Feedback saved to local fallback storage. Configure Google Sheets for durable Render storage.", flush=True)
+    print("[ProposalAI] Feedback saved to local development storage.", flush=True)
     return "local_log"
 
 
@@ -588,113 +577,6 @@ def append_feedback_to_google_sheet(record: dict[str, Any]) -> None:
             google_sheet_range(),
             {"majorDimension": "ROWS", "values": [row]},
         )
-
-
-def read_feedback_for_date(report_date: str) -> list[dict[str, Any]]:
-    load_dotenv()
-    if google_sheet_enabled():
-        values = google_sheet_request("GET", google_sheet_range()).get("values", [])
-        rows = values[1:] if values and values[0][: len(FEEDBACK_HEADERS)] == FEEDBACK_HEADERS else values
-        results: list[dict[str, Any]] = []
-        for row in rows:
-            padded = list(row) + [""] * max(0, len(FEEDBACK_HEADERS) - len(row))
-            if str(padded[1]) == report_date:
-                results.append(
-                    {
-                        "feedbackLabel": str(padded[2]),
-                        "comment": str(padded[3]),
-                        "style": str(padded[4]),
-                        "wordCount": str(padded[5]),
-                        "niche": str(padded[6]),
-                        "jobCategory": str(padded[7]),
-                    }
-                )
-        return results
-
-    path = feedback_log_path()
-    if not path.exists():
-        return []
-    results = []
-    with path.open("r", encoding="utf-8") as source:
-        for line in source:
-            try:
-                record = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            if record.get("dateIst") == report_date:
-                results.append(record)
-    return results
-
-
-def send_feedback_summary(body: dict[str, Any]) -> ApiResult:
-    load_dotenv()
-    requested_date = trim(body.get("date"))
-    today = datetime.now(IST).date().isoformat()
-    report_date = requested_date if re.fullmatch(r"\d{4}-\d{2}-\d{2}", requested_date) else today
-    try:
-        records = read_feedback_for_date(report_date)
-        summary_text = format_feedback_summary(report_date, records)
-        send_brevo_summary_email(report_date, summary_text)
-    except Exception as exc:
-        print(f"[ProposalAI] Feedback summary send failed: {type(exc).__name__}.", flush=True)
-        return error("Feedback summary could not be sent.", 503)
-    return ApiResult(200, {"ok": True, "date": report_date, "responses": len(records)})
-
-
-def format_feedback_summary(report_date: str, records: list[dict[str, Any]]) -> str:
-    choices = Counter(str(item.get("feedbackLabel", "")) for item in records)
-    styles = Counter(str(item.get("style", "")) for item in records)
-    comments = [trim(item.get("comment")) for item in records if trim(item.get("comment"))]
-    lines = [
-        f"ProposalAI feedback summary - {report_date} (IST)",
-        "",
-        f"Responses: {len(records)}",
-        f"This sounds human: {choices.get('This sounds human', 0)}",
-        f"Still sounds robotic: {choices.get('Still sounds robotic', 0)}",
-        f"Good but needs something: {choices.get('Good but needs something', 0)}",
-        "",
-        f"Quick proposals rated: {styles.get('quick', 0)}",
-        f"Detailed proposals rated: {styles.get('detailed', 0)}",
-    ]
-    if comments:
-        lines.extend(["", "Comments:"])
-        lines.extend(f"- {comment}" for comment in comments[:20])
-    else:
-        lines.extend(["", "No written comments today."])
-    return "\n".join(lines)
-
-
-def send_brevo_summary_email(report_date: str, text_content: str) -> None:
-    api_key = os.getenv("BREVO_API_KEY", "").strip()
-    sender = os.getenv("BREVO_FROM_EMAIL", "").strip()
-    recipient = os.getenv("PROPOSALAI_REPORT_EMAIL", "").strip()
-    if not api_key or not sender or not recipient:
-        raise RuntimeError("Brevo API summary configuration is incomplete")
-    payload: dict[str, Any] = {
-        "sender": {"name": "ProposalAI", "email": sender},
-        "to": [{"email": recipient}],
-        "subject": f"ProposalAI feedback summary - {report_date}",
-        "textContent": text_content,
-        "tags": ["proposalai-feedback"],
-    }
-    reply_to = os.getenv("BREVO_REPLY_TO_EMAIL", "").strip()
-    if reply_to:
-        payload["replyTo"] = {"email": reply_to}
-    api_url = os.getenv("BREVO_API_URL", BREVO_API_URL).strip() or BREVO_API_URL
-    request = urllib.request.Request(
-        api_url,
-        data=json.dumps(payload).encode("utf-8"),
-        headers={"Accept": "application/json", "Content-Type": "application/json", "api-key": api_key},
-        method="POST",
-    )
-    try:
-        with urllib.request.urlopen(request, timeout=25) as response:
-            response.read()
-    except urllib.error.HTTPError as exc:
-        exc.read()
-        raise RuntimeError(f"Brevo returned HTTP {exc.code}") from exc
-    except (urllib.error.URLError, TimeoutError) as exc:
-        raise RuntimeError("Brevo request failed") from exc
 
 
 def request_github_models(token: str, prompt: str, temperature: float = 0.7, max_tokens: int = 1300) -> ApiResult:
@@ -1273,7 +1155,7 @@ def main() -> None:
     port = int(os.getenv("PORT", "10000"))
     server = ThreadingHTTPServer(("0.0.0.0", port), ProposalAIHandler)
     print(f"ProposalAI listening on 0.0.0.0:{port}", flush=True)
-    print("Routes: /, /health, /api/generate-proposal, /api/feedback, /api/feedback-summary/send", flush=True)
+    print("Routes: /, /health, /api/generate-proposal, /api/feedback", flush=True)
     try:
         server.serve_forever()
     finally:

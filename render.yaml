@@ -16,13 +16,3 @@ services:
         sync: false
       - key: GOOGLE_SERVICE_ACCOUNT_JSON
         sync: false
-      - key: FEEDBACK_SUMMARY_SECRET
-        sync: false
-      - key: BREVO_API_KEY
-        sync: false
-      - key: BREVO_FROM_EMAIL
-        sync: false
-      - key: BREVO_REPLY_TO_EMAIL
-        sync: false
-      - key: PROPOSALAI_REPORT_EMAIL
-        sync: false
