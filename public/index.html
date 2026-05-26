@@ -442,6 +442,59 @@
       text-align: center;
     }
 
+    .feedback-panel {
+      padding: 18px;
+      border-top: 1px solid var(--line);
+      background: #ffffff;
+      border-radius: 0 0 var(--radius) var(--radius);
+    }
+
+    .feedback-panel h3 {
+      margin-bottom: 12px;
+      color: #263244;
+      font-size: 0.94rem;
+    }
+
+    .feedback-options {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .feedback-choice {
+      min-height: 46px;
+      padding: 9px 10px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--soft);
+      color: #344054;
+      font-size: 0.84rem;
+      font-weight: 700;
+      transition: border-color 160ms ease, background-color 160ms ease, color 160ms ease;
+    }
+
+    .feedback-choice:hover,
+    .feedback-choice[aria-pressed="true"] {
+      border-color: var(--blue);
+      background: var(--soft-blue);
+      color: var(--blue-strong);
+    }
+
+    .feedback-choice:disabled {
+      cursor: default;
+      opacity: 0.68;
+    }
+
+    .feedback-form {
+      display: grid;
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    .feedback-form textarea {
+      min-height: 78px;
+    }
+
     .hidden {
       display: none !important;
     }
@@ -493,7 +546,8 @@
 
       .grid-2,
       .rate-row,
-      .style-options {
+      .style-options,
+      .feedback-options {
         grid-template-columns: 1fr;
       }
 
@@ -531,7 +585,7 @@
           <h1>Turn any job post into a proposal you can send.</h1>
           <p class="intro-copy">Save your freelancer profile once. ProposalAI uses it to draft client-first proposals with your voice and most relevant proof.</p>
           <div class="proof-list" aria-label="ProposalAI workflow">
-            <div class="proof-item"><span class="proof-dot"></span><span>Profile stays private in this browser.</span></div>
+            <div class="proof-item"><span class="proof-dot"></span><span>Profile is saved locally, without an account.</span></div>
             <div class="proof-item"><span class="proof-dot"></span><span>No API key field for users.</span></div>
             <div class="proof-item"><span class="proof-dot"></span><span>Generated through the secure Render API.</span></div>
           </div>
@@ -654,6 +708,24 @@
             <button class="btn btn-secondary hidden" id="copyBtn" type="button">Copy</button>
           </div>
           <div class="proposal empty" id="proposalOutput">Your proposal will appear here.</div>
+          <section class="feedback-panel hidden" id="feedbackPanel" aria-label="Proposal feedback">
+            <h3>How does this draft sound?</h3>
+            <div class="feedback-options" role="group" aria-label="Choose feedback">
+              <button class="feedback-choice" data-feedback="human" type="button" aria-pressed="false">👍 This sounds human</button>
+              <button class="feedback-choice" data-feedback="robotic" type="button" aria-pressed="false">👎 Still sounds robotic</button>
+              <button class="feedback-choice" data-feedback="needs_something" type="button" aria-pressed="false">💡 Good but needs something</button>
+            </div>
+            <form class="feedback-form hidden" id="feedbackForm">
+              <label for="feedbackComment">
+                What would make it better? (optional)
+                <textarea id="feedbackComment" maxlength="800" rows="3" placeholder="What would make it better? (optional)"></textarea>
+              </label>
+              <div class="button-row">
+                <button class="btn" id="feedbackSubmitBtn" type="submit">Submit</button>
+                <span class="status" id="feedbackStatus" role="status"></span>
+              </div>
+            </form>
+          </section>
         </section>
       </div>
     </section>
@@ -664,6 +736,7 @@
     const LEGACY_KEYS = ["proposalai.profile.v3", "proposalai.profile.v2", "proposalai.profile.v1"];
     const MIN_JOB_CHARS = 50;
     const API_PATH = "/api/generate-proposal";
+    const FEEDBACK_API_PATH = "/api/feedback";
     const RETRY_MESSAGE = "Taking longer than usual - please try again.";
 
     const profileScreen = document.getElementById("profileScreen");
@@ -680,6 +753,14 @@
     const outputMeta = document.getElementById("outputMeta");
     const copyBtn = document.getElementById("copyBtn");
     const styleInputs = document.querySelectorAll('input[name="proposalStyle"]');
+    const feedbackPanel = document.getElementById("feedbackPanel");
+    const feedbackChoices = document.querySelectorAll(".feedback-choice");
+    const feedbackForm = document.getElementById("feedbackForm");
+    const feedbackComment = document.getElementById("feedbackComment");
+    const feedbackSubmitBtn = document.getElementById("feedbackSubmitBtn");
+    const feedbackStatus = document.getElementById("feedbackStatus");
+    let feedbackSelection = "";
+    let feedbackContext = null;
 
     const fields = {
       fullName: document.getElementById("fullName"),
@@ -784,6 +865,60 @@
       return document.querySelector('input[name="proposalStyle"]:checked')?.value || "quick";
     }
 
+    function resetFeedback() {
+      feedbackSelection = "";
+      feedbackContext = null;
+      feedbackPanel.classList.add("hidden");
+      feedbackForm.classList.add("hidden");
+      feedbackComment.value = "";
+      feedbackComment.disabled = false;
+      feedbackSubmitBtn.disabled = false;
+      setStatus(feedbackStatus, "");
+      feedbackChoices.forEach((choice) => {
+        choice.disabled = false;
+        choice.setAttribute("aria-pressed", "false");
+      });
+    }
+
+    function showFeedback(profile, job, style, words) {
+      feedbackContext = {
+        niche: profile.niche,
+        jobDescription: job,
+        style,
+        wordCount: words
+      };
+      feedbackPanel.classList.remove("hidden");
+    }
+
+    async function submitFeedback(event) {
+      event.preventDefault();
+      if (!feedbackSelection || !feedbackContext) return;
+      feedbackSubmitBtn.disabled = true;
+      setStatus(feedbackStatus, "Saving...");
+      try {
+        const response = await fetch(FEEDBACK_API_PATH, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ...feedbackContext,
+            feedbackType: feedbackSelection,
+            comment: feedbackComment.value.trim()
+          })
+        });
+        if (!response.ok) {
+          throw new Error("Feedback could not be saved.");
+        }
+        feedbackComment.disabled = true;
+        feedbackChoices.forEach((choice) => {
+          choice.disabled = true;
+        });
+        setStatus(feedbackStatus, "Thanks - your feedback is saved.", "success");
+      } catch {
+        feedbackSubmitBtn.disabled = false;
+        setStatus(feedbackStatus, "Feedback could not be saved. Please try again.", "error");
+      }
+    }
+
     async function generateProposal() {
       const profile = loadProfile();
       const job = jobDescription.value.trim();
@@ -808,6 +943,7 @@
       proposalOutput.textContent = "Generating your proposal...";
       outputMeta.textContent = "Working...";
       copyBtn.classList.add("hidden");
+      resetFeedback();
 
       try {
         const response = await fetch(API_PATH, {
@@ -837,8 +973,10 @@
         proposalOutput.textContent = proposal;
         proposalOutput.className = "proposal";
         const styleLabel = selectedStyle() === "detailed" ? "Detailed" : "Quick";
-        outputMeta.textContent = `${styleLabel} - ${data.wordCount || wordCount(proposal)} words. Ready to copy.`;
+        const words = data.wordCount || wordCount(proposal);
+        outputMeta.textContent = `${styleLabel} - ${words} words. Ready to copy.`;
         copyBtn.classList.remove("hidden");
+        showFeedback(profile, job, selectedStyle(), words);
         setStatus(generateStatus, "Proposal generated.", "success");
       } catch (error) {
         proposalOutput.className = "proposal empty";
@@ -903,6 +1041,16 @@
     styleInputs.forEach((input) => input.addEventListener("change", () => setStatus(generateStatus, "")));
     generateBtn.addEventListener("click", generateProposal);
     copyBtn.addEventListener("click", copyProposal);
+    feedbackChoices.forEach((choice) => choice.addEventListener("click", () => {
+      feedbackSelection = choice.dataset.feedback || "";
+      feedbackChoices.forEach((item) => {
+        item.setAttribute("aria-pressed", String(item === choice));
+      });
+      feedbackForm.classList.remove("hidden");
+      setStatus(feedbackStatus, "");
+      feedbackComment.focus();
+    }));
+    feedbackForm.addEventListener("submit", submitFeedback);
 
     const savedProfile = loadProfile();
     if (savedProfile) {

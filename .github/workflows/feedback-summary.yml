@@ -1,0 +1,23 @@
+name: Daily ProposalAI feedback summary
+
+on:
+  schedule:
+    - cron: "30 14 * * *"
+  workflow_dispatch:
+
+jobs:
+  send-feedback-summary:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Request today's feedback summary
+        env:
+          APP_URL: ${{ secrets.PROPOSALAI_RENDER_URL }}
+          SUMMARY_SECRET: ${{ secrets.FEEDBACK_SUMMARY_SECRET }}
+        run: |
+          test -n "$APP_URL"
+          test -n "$SUMMARY_SECRET"
+          curl --fail-with-body --retry 3 --retry-all-errors --retry-delay 30 --max-time 300 \
+            --request POST "${APP_URL%/}/api/feedback-summary/send" \
+            --header "Authorization: Bearer $SUMMARY_SECRET" \
+            --header "Content-Type: application/json" \
+            --data '{}'

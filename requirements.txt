@@ -1,1 +1,2 @@
-# ProposalAI uses only Python standard-library modules.
+google-auth>=2.38.0,<3.0
+requests>=2.32.0,<3.0

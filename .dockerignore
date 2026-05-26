@@ -5,3 +5,4 @@ __pycache__
 *.pyc
 *.pyo
 *.log
+feedback_data

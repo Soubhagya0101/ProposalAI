@@ -3,6 +3,7 @@
 !.env.example
 # Historical local data from the removed revenue automation.
 revenue_ops_data/
+feedback_data/
 __pycache__/
 *.py[cod]
 .pytest_cache/

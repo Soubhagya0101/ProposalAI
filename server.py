@@ -1,16 +1,21 @@
 from __future__ import annotations
 
 import json
+import hmac
 import mimetypes
 import os
 import re
+import threading
 import urllib.error
 import urllib.request
+import uuid
+from collections import Counter
 from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
-from urllib.parse import parse_qs, unquote, urlparse
+from urllib.parse import parse_qs, quote, unquote, urlencode, urlparse
 
 
 ROOT = Path(__file__).resolve().parent
@@ -18,6 +23,25 @@ PUBLIC_DIR = ROOT / "public"
 GITHUB_MODELS_URL = "https://models.github.ai/inference/chat/completions"
 MODEL_ID = "openai/gpt-4o-mini"
 USER_RETRY_MESSAGE = "Taking longer than usual - please try again."
+IST = timezone(timedelta(hours=5, minutes=30))
+BREVO_API_URL = "https://api.brevo.com/v3/smtp/email"
+FEEDBACK_TYPES = {
+    "human": "This sounds human",
+    "robotic": "Still sounds robotic",
+    "needs_something": "Good but needs something",
+}
+FEEDBACK_HEADERS = [
+    "Timestamp IST",
+    "Date IST",
+    "Feedback",
+    "Comment",
+    "Proposal Style",
+    "Words",
+    "Niche",
+    "Job Category",
+    "Feedback ID",
+]
+FEEDBACK_LOCK = threading.Lock()
 FORBIDDEN_PHRASES = (
     "passionate",
     "dedicated",
@@ -215,26 +239,46 @@ class ProposalAIHandler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:
         path = unquote(urlparse(self.path).path)
-        if path != "/api/generate-proposal":
+        if path not in {"/api/generate-proposal", "/api/feedback", "/api/feedback-summary/send"}:
             self.send_error(404, "Not found")
             return
 
+        payload = self._read_json_payload()
+        if payload is None:
+            return
+
+        if path == "/api/generate-proposal":
+            result = generate_proposal(payload)
+        elif path == "/api/feedback":
+            result = save_feedback(payload)
+        elif self._has_summary_access():
+            result = send_feedback_summary(payload)
+        else:
+            result = error("Not authorized.", 401)
+        self._send_json(result.payload, result.status)
+
+    def log_message(self, format: str, *args: object) -> None:
+        print("[%s] %s" % (self.log_date_time_string(), format % args), flush=True)
+
+    def _read_json_payload(self) -> dict[str, Any] | None:
         length = int(self.headers.get("Content-Length", "0") or 0)
         raw = self.rfile.read(length) if length else b"{}"
         try:
             payload = json.loads(raw.decode("utf-8"))
         except json.JSONDecodeError as exc:
             self._send_json({"error": f"Invalid JSON request: {exc.msg}."}, 400)
-            return
+            return None
         if not isinstance(payload, dict):
             self._send_json({"error": "Request body must be a JSON object."}, 400)
-            return
+            return None
+        return payload
 
-        result = generate_proposal(payload)
-        self._send_json(result.payload, result.status)
-
-    def log_message(self, format: str, *args: object) -> None:
-        print("[%s] %s" % (self.log_date_time_string(), format % args), flush=True)
+    def _has_summary_access(self) -> bool:
+        load_dotenv()
+        expected = os.getenv("FEEDBACK_SUMMARY_SECRET", "").strip()
+        header = self.headers.get("Authorization", "")
+        supplied = header.removeprefix("Bearer ").strip()
+        return bool(expected and supplied and hmac.compare_digest(expected, supplied))
 
     def _send_empty(self, status: int, content_type: str) -> None:
         self.send_response(status)
@@ -394,6 +438,263 @@ def generate_proposal(body: dict[str, Any], test_mode: bool = False) -> ApiResul
         print(f"[ProposalAI] Draft accepted with warnings: {'; '.join(warnings)}.", flush=True)
 
     return ApiResult(200, {"model": MODEL_ID, "style": style, "proposal": proposal.strip(), "wordCount": word_count(proposal)})
+
+
+def save_feedback(body: dict[str, Any]) -> ApiResult:
+    feedback_type = trim(body.get("feedbackType")).lower()
+    if feedback_type not in FEEDBACK_TYPES:
+        return error("Choose one feedback option before submitting.", 400)
+
+    comment = trim(body.get("comment"))[:800]
+    style = normalize_style(body.get("style"))
+    niche = trim(body.get("niche"))[:100]
+    job_category = classify_proof_category(trim(body.get("jobDescription"))) or "other"
+    try:
+        words = max(0, min(int(body.get("wordCount", 0) or 0), 1000))
+    except (TypeError, ValueError):
+        words = 0
+    timestamp = datetime.now(IST)
+    record = {
+        "timestampIst": timestamp.isoformat(timespec="seconds"),
+        "dateIst": timestamp.date().isoformat(),
+        "feedbackType": feedback_type,
+        "feedbackLabel": FEEDBACK_TYPES[feedback_type],
+        "comment": comment,
+        "style": style,
+        "wordCount": words,
+        "niche": niche,
+        "jobCategory": job_category,
+        "id": uuid.uuid4().hex,
+    }
+
+    try:
+        storage = append_feedback(record)
+    except Exception as exc:
+        print(f"[ProposalAI] Feedback storage failed: {type(exc).__name__}.", flush=True)
+        return error("Feedback could not be saved. Please try again.", 503)
+    return ApiResult(201, {"ok": True, "message": "Thanks - your feedback is saved.", "storage": storage})
+
+
+def append_feedback(record: dict[str, Any]) -> str:
+    load_dotenv()
+    if google_sheet_enabled():
+        append_feedback_to_google_sheet(record)
+        return "google_sheet"
+
+    path = feedback_log_path()
+    with FEEDBACK_LOCK:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("a", encoding="utf-8") as output:
+            output.write(json.dumps(record, ensure_ascii=False) + "\n")
+    print("[ProposalAI] Feedback saved to local fallback storage. Configure Google Sheets for durable Render storage.", flush=True)
+    return "local_log"
+
+
+def feedback_log_path() -> Path:
+    configured = os.getenv("PROPOSALAI_FEEDBACK_LOG_PATH", "").strip()
+    return Path(configured) if configured else ROOT / "feedback_data" / "feedback.jsonl"
+
+
+def google_sheet_enabled() -> bool:
+    sheet_id = os.getenv("PROPOSALAI_FEEDBACK_SHEET_ID", "").strip()
+    credentials = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON", "").strip()
+    if bool(sheet_id) != bool(credentials):
+        raise RuntimeError("Incomplete Google Sheets configuration")
+    return bool(sheet_id and credentials)
+
+
+def google_sheet_range() -> str:
+    return os.getenv("PROPOSALAI_FEEDBACK_SHEET_RANGE", "Feedback!A:I").strip() or "Feedback!A:I"
+
+
+def google_sheet_header_range() -> str:
+    return os.getenv("PROPOSALAI_FEEDBACK_HEADER_RANGE", "Feedback!A1:I1").strip() or "Feedback!A1:I1"
+
+
+def google_access_token() -> str:
+    try:
+        from google.auth.transport.requests import Request as GoogleRequest
+        from google.oauth2 import service_account
+    except ImportError as exc:
+        raise RuntimeError("google-auth is not installed") from exc
+
+    try:
+        service_info = json.loads(os.environ["GOOGLE_SERVICE_ACCOUNT_JSON"])
+    except (KeyError, json.JSONDecodeError) as exc:
+        raise RuntimeError("Invalid Google service account configuration") from exc
+    credentials = service_account.Credentials.from_service_account_info(
+        service_info,
+        scopes=["https://www.googleapis.com/auth/spreadsheets"],
+    )
+    credentials.refresh(GoogleRequest())
+    return str(credentials.token)
+
+
+def google_sheet_request(method: str, cell_range: str, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+    sheet_id = quote(os.environ["PROPOSALAI_FEEDBACK_SHEET_ID"].strip(), safe="")
+    encoded_range = quote(cell_range, safe="!:")
+    parameters = ""
+    if method == "POST":
+        parameters = "?" + urlencode({"valueInputOption": "RAW", "insertDataOption": "INSERT_ROWS"})
+    elif method == "PUT":
+        parameters = "?" + urlencode({"valueInputOption": "RAW"})
+    url = f"https://sheets.googleapis.com/v4/spreadsheets/{sheet_id}/values/{encoded_range}"
+    if method == "POST":
+        url += ":append"
+    url += parameters
+    data = json.dumps(payload).encode("utf-8") if payload is not None else None
+    request = urllib.request.Request(
+        url,
+        data=data,
+        headers={
+            "Authorization": f"Bearer {google_access_token()}",
+            "Content-Type": "application/json",
+        },
+        method=method,
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=25) as response:
+            raw = response.read().decode("utf-8", errors="replace")
+            return json.loads(raw) if raw.strip() else {}
+    except urllib.error.HTTPError as exc:
+        exc.read()
+        raise RuntimeError(f"Google Sheets returned HTTP {exc.code}") from exc
+    except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as exc:
+        raise RuntimeError("Google Sheets request failed") from exc
+
+
+def append_feedback_to_google_sheet(record: dict[str, Any]) -> None:
+    row = [
+        record["timestampIst"],
+        record["dateIst"],
+        record["feedbackLabel"],
+        record["comment"],
+        record["style"],
+        record["wordCount"],
+        record["niche"],
+        record["jobCategory"],
+        record["id"],
+    ]
+    with FEEDBACK_LOCK:
+        first_row = google_sheet_request("GET", google_sheet_header_range())
+        if not first_row.get("values"):
+            google_sheet_request(
+                "PUT",
+                google_sheet_header_range(),
+                {"majorDimension": "ROWS", "values": [FEEDBACK_HEADERS]},
+            )
+        google_sheet_request(
+            "POST",
+            google_sheet_range(),
+            {"majorDimension": "ROWS", "values": [row]},
+        )
+
+
+def read_feedback_for_date(report_date: str) -> list[dict[str, Any]]:
+    load_dotenv()
+    if google_sheet_enabled():
+        values = google_sheet_request("GET", google_sheet_range()).get("values", [])
+        rows = values[1:] if values and values[0][: len(FEEDBACK_HEADERS)] == FEEDBACK_HEADERS else values
+        results: list[dict[str, Any]] = []
+        for row in rows:
+            padded = list(row) + [""] * max(0, len(FEEDBACK_HEADERS) - len(row))
+            if str(padded[1]) == report_date:
+                results.append(
+                    {
+                        "feedbackLabel": str(padded[2]),
+                        "comment": str(padded[3]),
+                        "style": str(padded[4]),
+                        "wordCount": str(padded[5]),
+                        "niche": str(padded[6]),
+                        "jobCategory": str(padded[7]),
+                    }
+                )
+        return results
+
+    path = feedback_log_path()
+    if not path.exists():
+        return []
+    results = []
+    with path.open("r", encoding="utf-8") as source:
+        for line in source:
+            try:
+                record = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if record.get("dateIst") == report_date:
+                results.append(record)
+    return results
+
+
+def send_feedback_summary(body: dict[str, Any]) -> ApiResult:
+    load_dotenv()
+    requested_date = trim(body.get("date"))
+    today = datetime.now(IST).date().isoformat()
+    report_date = requested_date if re.fullmatch(r"\d{4}-\d{2}-\d{2}", requested_date) else today
+    try:
+        records = read_feedback_for_date(report_date)
+        summary_text = format_feedback_summary(report_date, records)
+        send_brevo_summary_email(report_date, summary_text)
+    except Exception as exc:
+        print(f"[ProposalAI] Feedback summary send failed: {type(exc).__name__}.", flush=True)
+        return error("Feedback summary could not be sent.", 503)
+    return ApiResult(200, {"ok": True, "date": report_date, "responses": len(records)})
+
+
+def format_feedback_summary(report_date: str, records: list[dict[str, Any]]) -> str:
+    choices = Counter(str(item.get("feedbackLabel", "")) for item in records)
+    styles = Counter(str(item.get("style", "")) for item in records)
+    comments = [trim(item.get("comment")) for item in records if trim(item.get("comment"))]
+    lines = [
+        f"ProposalAI feedback summary - {report_date} (IST)",
+        "",
+        f"Responses: {len(records)}",
+        f"This sounds human: {choices.get('This sounds human', 0)}",
+        f"Still sounds robotic: {choices.get('Still sounds robotic', 0)}",
+        f"Good but needs something: {choices.get('Good but needs something', 0)}",
+        "",
+        f"Quick proposals rated: {styles.get('quick', 0)}",
+        f"Detailed proposals rated: {styles.get('detailed', 0)}",
+    ]
+    if comments:
+        lines.extend(["", "Comments:"])
+        lines.extend(f"- {comment}" for comment in comments[:20])
+    else:
+        lines.extend(["", "No written comments today."])
+    return "\n".join(lines)
+
+
+def send_brevo_summary_email(report_date: str, text_content: str) -> None:
+    api_key = os.getenv("BREVO_API_KEY", "").strip()
+    sender = os.getenv("BREVO_FROM_EMAIL", "").strip()
+    recipient = os.getenv("PROPOSALAI_REPORT_EMAIL", "").strip()
+    if not api_key or not sender or not recipient:
+        raise RuntimeError("Brevo API summary configuration is incomplete")
+    payload: dict[str, Any] = {
+        "sender": {"name": "ProposalAI", "email": sender},
+        "to": [{"email": recipient}],
+        "subject": f"ProposalAI feedback summary - {report_date}",
+        "textContent": text_content,
+        "tags": ["proposalai-feedback"],
+    }
+    reply_to = os.getenv("BREVO_REPLY_TO_EMAIL", "").strip()
+    if reply_to:
+        payload["replyTo"] = {"email": reply_to}
+    api_url = os.getenv("BREVO_API_URL", BREVO_API_URL).strip() or BREVO_API_URL
+    request = urllib.request.Request(
+        api_url,
+        data=json.dumps(payload).encode("utf-8"),
+        headers={"Accept": "application/json", "Content-Type": "application/json", "api-key": api_key},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=25) as response:
+            response.read()
+    except urllib.error.HTTPError as exc:
+        exc.read()
+        raise RuntimeError(f"Brevo returned HTTP {exc.code}") from exc
+    except (urllib.error.URLError, TimeoutError) as exc:
+        raise RuntimeError("Brevo request failed") from exc
 
 
 def request_github_models(token: str, prompt: str, temperature: float = 0.7, max_tokens: int = 1300) -> ApiResult:
@@ -972,7 +1273,7 @@ def main() -> None:
     port = int(os.getenv("PORT", "10000"))
     server = ThreadingHTTPServer(("0.0.0.0", port), ProposalAIHandler)
     print(f"ProposalAI listening on 0.0.0.0:{port}", flush=True)
-    print("Routes: /, /health, /api/generate-proposal", flush=True)
+    print("Routes: /, /health, /api/generate-proposal, /api/feedback, /api/feedback-summary/send", flush=True)
     try:
         server.serve_forever()
     finally:
