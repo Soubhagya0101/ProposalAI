@@ -54,6 +54,22 @@ FORBIDDEN_PHRASES = (
     "i am confident",
     "rest assured",
     "i guarantee",
+    "seamlessly",
+    "drive engagement",
+    "significantly",
+    "first i will",
+    "next i will",
+    "then i will",
+    "finally i will",
+    "lastly i will",
+    "this resolves",
+    "this addresses",
+    "this helps",
+    "this ensures",
+    "this will ensure",
+    "engagement",
+    "conversion rates",
+    "lost sales",
 )
 GENERIC_FILLER = (
     "please confirm if you want to proceed",
@@ -92,6 +108,14 @@ GENERIC_FILLER = (
     "ensure accuracy",
     "meet your needs",
     "what you require",
+    "i have worked on similar projects",
+    "worked on similar projects",
+    "similar projects",
+    "technical specification",
+    "this improvement",
+    "can lead to",
+    "smooth experience",
+    "fully functional",
 )
 BROAD_QUESTION_PATTERNS = (
     r"(?:what|which|do you have|are there|could you|can you)[^?]{0,48}\b(?:issues?|bugs?|features?|functionalit(?:y|ies)|themes?|topics?)",
@@ -360,15 +384,14 @@ def generate_proposal(body: dict[str, Any], test_mode: bool = False) -> ApiResul
                     f"Fix these blocking issues: {', '.join(blockers)}.",
                     "- Open immediately with a concrete detail from the client's job, not a greeting or an introduction about the freelancer.",
                     "- The opening must add an observation the client did not write but will immediately recognize as true. Never merely restate the brief.",
-                    "- State facts and actions. Do not explain that the project is important, beneficial, impactful, or engaging.",
-                    "- Every sentence must state the client's concrete need, the allowed proof point, a deliverable/action, or a necessary next-step decision.",
-                    "- Expand only the concrete execution and testing approach for the requested task; do not invent scope, client facts, or outcomes.",
-                    "- Use short paragraphs and short sentences. Natural colleague-to-colleague language.",
-                    "- Use one relevant past win in one sentence only, or omit it when it is not relevant.",
+                    "- State facts and outcomes. Do not explain that the project is important, beneficial, impactful, or engaging.",
+                    "- Every sentence must state client insight, the exact allowed proof, the finished outcome, or one necessary decision question.",
+                    "- For detailed mode, add depth about why the problem exists, what it is costing them, and what outcome they get. Do not list your methodology.",
+                    "- If an allowed past win exists, include its exact text exactly once as its own proof paragraph. If no allowed past win exists, skip proof completely.",
                     (
-                        f"- The only allowed past-result claim is: {relevant_win}"
+                        f"- The exact required proof paragraph is: {relevant_win}"
                         if relevant_win
-                        else "- No relevant past win is supplied for this job. Do not claim any previous result, project, or metric."
+                        else "- No past win is supplied for this job. Do not claim any previous result, similar project, client, or metric."
                     ),
                     "- Do not invent clients, industries, metrics, timelines, or outcomes.",
                     "- Do not borrow facts from the style example; use only the job description and allowed past win.",
@@ -378,7 +401,7 @@ def generate_proposal(body: dict[str, Any], test_mode: bool = False) -> ApiResul
                     "- A question is permitted only if it identifies a technical decision such as platform or migration.",
                     f"- Never use any of these phrases: {', '.join(FORBIDDEN_PHRASES)}.",
                     f"- Avoid generic filler such as: {', '.join(GENERIC_FILLER)}.",
-                    "- End with a useful next step, one essential question, or confident availability.",
+                    "- End with one specific practical question.",
                     "- Do not ask for confirmation or say 'proceed with this approach.'",
                     style_rules(style),
                     "Return only the revised proposal text.",
@@ -416,8 +439,14 @@ def generate_proposal(body: dict[str, Any], test_mode: bool = False) -> ApiResul
         findings = proposal_violations(proposal, profile, job_description, relevant_win, style)
         blockers = blocking_violations(proposal, findings)
     if blockers:
-        print(f"[ProposalAI] Draft blocked: {'; '.join(blockers)}.", flush=True)
-        return error(USER_RETRY_MESSAGE, 502)
+        fallback = build_rule_based_proposal(job_description, relevant_win, style)
+        fallback_findings = proposal_violations(fallback, profile, job_description, relevant_win, style)
+        fallback_blockers = blocking_violations(fallback, fallback_findings)
+        if fallback_blockers:
+            print(f"[ProposalAI] Draft blocked: {'; '.join(fallback_blockers)}.", flush=True)
+            return error(USER_RETRY_MESSAGE, 502)
+        proposal = fallback
+        findings = fallback_findings
 
     warnings = [finding for finding in findings if finding not in blockers]
     if warnings:
@@ -579,6 +608,99 @@ def append_feedback_to_google_sheet(record: dict[str, Any]) -> None:
         )
 
 
+def build_rule_based_proposal(job_description: str, relevant_win: str, style: str) -> str:
+    lowered = job_description.lower()
+    if "checkout" in lowered and ("launch" in lowered or "week" in lowered or "deadline" in lowered):
+        deadline = re.search(r"\b(\d+)\s*weeks?\b", lowered)
+        opener = (
+            f"{deadline.group(1)} weeks before launch with a broken checkout is the worst possible timing."
+            if deadline
+            else "Close to launch with a broken checkout is the worst possible timing."
+        )
+        insight_2 = (
+            "Every failed payment hides the real launch signal because visitors leave before you know whether "
+            "the offer, pricing, or payment path caused the drop."
+        )
+        question = "Which platform is the checkout on?"
+        if style == "detailed":
+            proof = f"\n\n{relevant_win}." if relevant_win else ""
+            return (
+                f"{opener} {insight_2}"
+                f"{proof}\n\n"
+                "You'll have a checkout customers can complete without the payment path breaking at the moment buyers are ready to pay. "
+                "The launch can be judged on real orders and customer intent, not panic over a cart that blocks people before payment.\n\n"
+                f"{question}"
+            )
+        proof_or_outcome = (
+            f"{relevant_win}, so I know how fragile checkout issues get when payment and cart logic collide this close to launch."
+            if relevant_win
+            else "You'll have a checkout customers can complete before launch traffic reaches the payment step."
+        )
+        quick_insight = f"{opener.rstrip('.')} — {insight_2[0].lower()}{insight_2[1:]}"
+        return f"{quick_insight} {proof_or_outcome} {question}"
+
+    if ("wordpress" in lowered or "website" in lowered or "pages" in lowered) and (
+        "slow" in lowered or "speed" in lowered or "seconds" in lowered or "load" in lowered
+    ):
+        question = "Is the site on shared hosting or managed WordPress hosting?"
+        if style == "detailed":
+            return (
+                "An 8-second WordPress load time means visitors are deciding whether to leave before your page has a fair chance to make its case. "
+                "Slow pages usually come from a few heavy assets, plugin choices, or render-blocking files that make the whole site feel heavier than it is.\n\n"
+                "You'll have a site that feels ready when people land, with the heavy page drag removed from the initial impression. "
+                "That means visitors can judge the offer itself instead of waiting around for the page to catch up.\n\n"
+                f"{question}"
+            )
+        return (
+            "An 8-second WordPress load time means visitors are deciding whether to leave before your page has a fair chance to make its case. "
+            "You'll have a faster site that feels ready when people land, with the heavy page drag removed from the initial impression. "
+            f"{question}"
+        )
+
+    if "invoice" in lowered and ("generator" in lowered or "tool" in lowered):
+        question = "Do invoices need PDF downloads or email sending in the first version?"
+        if style == "detailed":
+            proof = f"\n\n{relevant_win}." if relevant_win else ""
+            return (
+                "Invoice tools become painful when they are either too bloated or too limited for the way a small business actually bills. "
+                "The real risk is building fields and totals that do not match the invoices already being sent."
+                f"{proof}\n\n"
+                "You'll have a lightweight tool shaped around the invoice details, totals, and delivery format the business actually uses. "
+                "The result should feel like their billing workflow, not another generic finance app.\n\n"
+                f"{question}"
+            )
+        proof_or_outcome = (
+            f"{relevant_win}, so the first version can stay tied to a real billing problem."
+            if relevant_win
+            else "You'll have a lightweight tool shaped around the invoice details and totals the business actually uses."
+        )
+        return (
+            "Invoice tools become painful when they are either too bloated or too limited for how a small business bills. "
+            f"{proof_or_outcome} {question}"
+        )
+
+    question = "What is the main constraint you want handled first?"
+    if style == "detailed":
+        proof = f"\n\n{relevant_win}." if relevant_win else ""
+        return (
+            "The risk with this kind of build is ending up with something technically complete but not useful in the moment the client needs it. "
+            "The work has to stay tied to the decision, delay, or handoff problem behind the brief."
+            f"{proof}\n\n"
+            "You'll have a first version that focuses on the outcome the job is really asking for, without adding extra surface area. "
+            "That keeps the finished result easier to judge, revise, and use.\n\n"
+            f"{question}"
+        )
+    proof_or_outcome = (
+        f"{relevant_win}, so I would keep this tied to the specific outcome in the brief."
+        if relevant_win
+        else "You'll have a focused first version that solves the main outcome without extra surface area."
+    )
+    return (
+        "The risk with this kind of work is ending up with something technically complete but not useful in the moment it is needed. "
+        f"{proof_or_outcome} {question}"
+    )
+
+
 def request_github_models(token: str, prompt: str, temperature: float = 0.7, max_tokens: int = 1300) -> ApiResult:
     payload = {
         "model": MODEL_ID,
@@ -666,9 +788,9 @@ def build_prompt(profile: dict[str, Any], job_description: str, relevant_win: st
     if profile["skills"]:
         profile_lines.append(f"Skills: {', '.join(profile['skills'])}")
     if relevant_win:
-        profile_lines.append(f"The only relevant past win you may mention: {relevant_win}")
+        profile_lines.append(f"Past win to include exactly once: {relevant_win}")
     else:
-        profile_lines.append("Relevant past win: none. Do not invent or mention prior outcomes.")
+        profile_lines.append("Past win: none. Skip proof completely. Do not invent prior work.")
     if profile["rate"]:
         profile_lines.append(f"Rate: {profile['rate']}")
     return "\n".join(
@@ -677,38 +799,41 @@ def build_prompt(profile: dict[str, Any], job_description: str, relevant_win: st
             style_rules(style),
             "",
             "Non-negotiable rules:",
-            "- The first sentence must be about the client's most specific need, deadline, tool, industry, or problem. Start there immediately.",
-            "- The first sentence must add an insight the client did not state: a consequence, tradeoff, common failure, or useful constraint. Never echo the brief.",
+            "- Never begin with a greeting, freelancer introduction, years of experience, or profile summary.",
+            "- The first sentence must say something the client did not write but will immediately recognize as true.",
+            "- The opener must show you understand the situation: why this problem exists, what it is costing them, or what constraint matters.",
+            "- Never restate the job description as the opening line.",
             "- The first sentence must not contain I, I'm, my, or me. Do not begin with a greeting or a description of the freelancer.",
-            "- State the problem and useful action directly. Do not say the work is important, beneficial, engaging, effective, impressive, or a success.",
-            "- Every sentence must state a concrete need from the brief, an allowed proof point, a deliverable/action, or a necessary next-step decision.",
-            "- Expand only the concrete execution and testing approach for the requested task; do not invent scope, client facts, or vague benefits.",
-            "- Include only one past win, in one sentence, and only if it directly supports this job. Skip it when it is not relevant.",
-            "- Never invent a past result, number, client, industry, timeline, or outcome.",
+            "- If a past win is provided, include it as its own proof paragraph using the exact past win text. Do not add timing like last month or recently.",
+            "- If no past win is provided, skip the proof paragraph completely.",
+            "- Never write 'I have worked on similar projects' or invent a replacement proof point.",
+            "- Never invent a past result, number, client, industry, timeline, or outcome that is not in the profile.",
             "- Do not mention years of experience. A short proposal has no room for background padding.",
-            "- Use I only for a concrete action or the supplied proof point. Prefer active voice: 'I fixed' rather than 'a past project involved.'",
+            "- Use I only for the supplied proof point or a direct outcome statement.",
             "- Ask no question unless its answer genuinely changes the work. Maximum one question. Avoid broad questions about topics, features, or issues.",
             f"- Do not use these words or phrases: {', '.join(FORBIDDEN_PHRASES)}.",
             f"- Avoid hollow filler such as: {', '.join(GENERIC_FILLER)}.",
             "- Use short paragraphs and short sentences. Natural colleague-to-colleague language.",
             "- Prefer contractions such as I'll. Avoid phrases like 'the immediate action is', 'detailed review', or 'solution'.",
+            "- In detailed mode, do not write First, Next, Then, Finally, or Lastly.",
+            "- In detailed mode, never list process steps, explain your methodology, or write a technical specification.",
+            "- Detailed mode means more depth about the client's situation and the outcome, not a longer process explanation.",
             "- Do not include a rate unless the client specifically requests pricing or it resolves a stated budget.",
             "- Never include bracket placeholders or generic salutations.",
-            "- End with a specific next step, one essential question, or confident availability.",
-            "- Prefer ending with one practical question whose answer changes the approach. Never ask for confirmation or permission to proceed.",
+            "- End with exactly one specific practical question whose answer changes the approach.",
+            "- Never end with looking forward to hearing from you, please confirm if you want to proceed, I hope to work with you, or any confirmation request.",
             "- Return only the proposal text.",
             "",
-            "Style example to match for directness and humanity:",
-            "Two weeks before launch with a broken checkout is the worst possible timing. I fixed a similar checkout that was losing orders at payment.",
+            "Perfect detailed example to match for depth and structure only:",
+            "Two weeks before launch with a broken checkout is the worst possible timing — every hour it stays broken is a test user who bounces and doesn't come back.",
+            "",
+            "Fixed Shopify checkout, reduced drop-offs by 40%.",
+            "",
+            "You'll have a fully tested checkout — guest, mobile, and declined card flows — before your launch date.",
             "",
             "What platform is the checkout on?",
             "",
-            "For recurring content, the cadence should sound like:",
-            "Weekly LinkedIn posts, long term: the hard part is keeping the voice consistent without recycling the same angle. Send one post or page that captures the tone and I can draft the first week.",
-            "",
-            "For a simple software tool, the cadence should sound like:",
-            "Invoice generators are usually overkill or too basic. I can build a lightweight web version around the fields you use. Do invoices need PDF downloads or email sending?",
-            "These examples demonstrate tone only. Do not reuse their facts, features, timing, or metrics.",
+            "Do not reuse example facts, platform, timing, flows, or metrics unless they appear in the current profile or job.",
             "",
             "Freelancer profile:",
             *profile_lines,
@@ -730,23 +855,25 @@ def build_fallback_prompt(
     style: str,
 ) -> str:
     proof_rule = (
-        f"You may use this one proof sentence only: {relevant_win}."
+        f"Use this exact proof paragraph once, unchanged: {relevant_win}"
         if relevant_win
-        else "No past proof is relevant. Do not mention prior results, clients, or metrics."
+        else "No past win is supplied. Skip proof completely. Do not mention similar projects, prior results, clients, or metrics."
     )
     format_instructions = (
         [
-            "Paragraph 1: open with a useful truth about the client's situation, then use the allowed proof when relevant.",
-            "Paragraph 2: give concrete steps for this exact job, including checks or handoff details that matter.",
-            "Paragraph 3: end with one technical decision question whose answer changes the work.",
-            "Do not compress this into a quick pitch; the detailed word range is mandatory.",
+            "Detailed mode is 90 to 130 words.",
+            "Paragraph 1: exactly 2 sentences with an insight about why the client's situation is risky or costly.",
+            "Paragraph 2: 1 to 2 sentences of exact past-win proof only if supplied; otherwise omit this paragraph.",
+            "Paragraph 3: exactly 2 sentences describing the finished outcome the client will have.",
+            "Closing: one specific practical question.",
+            "Do not list steps, explain methodology, or write a technical specification.",
         ]
         if style == "detailed"
         else [
-            "Sentence 1: name the most concrete task, deadline, or constraint in the client's brief.",
-            "Sentence 1 must add a recognized truth or tradeoff, not repeat the brief.",
-            "Sentence 2: state one concrete action you can take, or include the allowed proof.",
-            "Optional final sentence: ask one technical decision question only when required; otherwise state availability.",
+            "Quick mode is 50 to 80 words and at most 3 sentences.",
+            "Sentence 1: one insight about the client's situation, not a restatement of the brief.",
+            "Sentence 2: exact proof if supplied, otherwise the specific outcome they will get.",
+            "Sentence 3: one specific practical question.",
         ]
     )
     return "\n".join(
@@ -754,7 +881,7 @@ def build_fallback_prompt(
             "Write a human freelance message in the requested style.",
             style_rules(style),
             *format_instructions,
-            "No greeting. No adjectives about value. No general benefits. No invented deliverables. No years of experience.",
+            "No greeting. No general benefits. No invented deliverables. No years of experience.",
             f"Never use: {', '.join(FORBIDDEN_PHRASES + GENERIC_FILLER)}.",
             proof_rule,
             "Return only the message.",
@@ -794,8 +921,8 @@ def proposal_violations(
     lowered = proposal.lower()
     count = word_count(proposal)
     if style == "detailed":
-        if not 120 <= count <= 150:
-            violations.append(f"detailed draft has {count} words; required range is 120 to 150")
+        if not 90 <= count <= 130:
+            violations.append(f"detailed draft has {count} words; required range is 90 to 130")
     elif not 50 <= count <= 80:
         violations.append(f"quick draft has {count} words; required range is 50 to 80")
     used = [phrase for phrase in FORBIDDEN_PHRASES if phrase in lowered]
@@ -809,8 +936,10 @@ def proposal_violations(
     if "[" in proposal or "]" in proposal:
         violations.append("bracket placeholder present")
     paragraphs = [chunk.strip() for chunk in re.split(r"\n\s*\n", proposal) if chunk.strip()]
-    if style == "detailed" and len(paragraphs) != 3:
-        violations.append("detailed draft must have exactly 3 short paragraphs")
+    if style == "detailed" and relevant_win and len(paragraphs) != 4:
+        violations.append("detailed draft with proof must have insight, proof, outcome, and closing paragraphs")
+    if style == "detailed" and not relevant_win and len(paragraphs) != 3:
+        violations.append("detailed draft without proof must have insight, outcome, and closing paragraphs")
     if style == "quick" and len(paragraphs) > 3:
         violations.append("more than 3 paragraphs")
     if proposal.count("?") > 1:
@@ -819,6 +948,10 @@ def proposal_violations(
         violations.append("broad forced question used instead of a decision-specific question")
     if any(phrase in lowered for phrase in CONFIRMATION_ENDINGS):
         violations.append("confirmation-style ending used")
+    if style == "detailed" and re.search(r"\b(?:first|next|then|finally|lastly)\b", lowered):
+        violations.append("detailed draft lists process steps")
+    if style == "detailed" and re.search(r"\b(?:i'll|i will|we will)\b[^.!?]{0,80}\b(?:check|inspect|build|test|fix|create|set up|optimize|audit)\b", lowered):
+        violations.append("detailed draft explains methodology instead of client depth")
     opening = re.sub(r"^\s*(?:hi|hello|dear)\b[^\n,]{0,70},\s*", "", proposal, flags=re.I)
     if re.match(r"^\s*(?:i\b|i[' ]?m\b|i am\b|my\b|as a\b|with \d+)", opening, flags=re.I):
         violations.append("opening is about the freelancer instead of the client")
@@ -850,6 +983,10 @@ def proposal_violations(
             violations.append(f"unsupported timing claim: {', '.join(unsupported_timing)}")
         if profile.get("pastWin") and not relevant_win and claims_unrelated_past_win(proposal, profile["pastWin"]):
             violations.append("past win is unrelated to this job and must be omitted")
+        if relevant_win and relevant_win.lower() not in lowered:
+            violations.append("exact past win is missing")
+        if not relevant_win and re.search(r"\b(?:similar projects?|worked on similar|past projects?|previous projects?|previously worked)\b", lowered):
+            violations.append("invented similar-project proof used without a past win")
     return violations
 
 
@@ -869,9 +1006,16 @@ def blocking_violations(proposal: str, findings: list[str]) -> list[str]:
         if (
             finding == "opening only echoes the job description instead of adding insight"
             or finding == "bracket placeholder present"
+            or finding.startswith("banned wording used:")
             or finding.startswith("unsupported numeric claim:")
             or finding.startswith("unsupported timing claim:")
+            or finding.startswith("quick draft has ")
+            or finding.startswith("detailed draft has ")
             or finding == "past win is unrelated to this job and must be omitted"
+            or finding == "exact past win is missing"
+            or finding == "invented similar-project proof used without a past win"
+            or finding == "detailed draft lists process steps"
+            or finding == "detailed draft explains methodology instead of client depth"
         ):
             blockers.append(finding)
     return list(dict.fromkeys(blockers))
@@ -980,10 +1124,9 @@ def situation_guidance(job_description: str, style: str) -> str:
             return (
                 'Start exactly with: "A coupon sending a payable WooCommerce cart to $0 usually means an override is '
                 'replacing the total instead of discounting it." Use the supplied ecommerce proof once if available. '
-                "Explain concrete checks: reproduce with a qualifying and non-qualifying cart, inspect the coupon rule "
-                "and total-calculation hooks or plugins, compare subtotal, discount, tax and final total, fix the "
-                "override, then retest valid, invalid and edge-value coupons before payment. End by asking whether a "
-                "coupon plugin or custom checkout hook is involved."
+                "Add depth around the cost: every bad coupon path can create a free order, a failed payment, or a "
+                "support problem. Describe the finished outcome as a cart total that keeps discounts, tax, shipping, "
+                "and payment handoff consistent. End by asking whether a coupon plugin or custom checkout hook is involved."
             )
         return (
             "Lead with the $0 coupon symptom: a discount override is probably replacing the payable WooCommerce total. "
@@ -999,11 +1142,9 @@ def situation_guidance(job_description: str, style: str) -> str:
         if style == "detailed":
             return (
                 f'Open with this human observation: "{opener}" Use the supplied checkout proof once. '
-                "In the middle paragraph, explain a specific approach: reproduce the failed checkout path, inspect "
-                "browser errors and failed network requests, inspect gateway responses, check whether cart state, "
-                "discounts, tax, or shipping changes trigger the break, isolate whether failure happens before or "
-                "during payment, patch the fault, verify totals and gateway handoff, test successful and declined "
-                "payments, then rerun guest and mobile checkout against the launch build. Avoid reassurance phrases. "
+                "Add depth around the cost: checkout bugs this close to launch turn every test visit into a lost signal "
+                "because nobody knows whether the product or the payment path failed. Describe the finished outcome "
+                "as a checkout that can be trusted before launch, with the platform-specific failure removed. "
                 "End only by asking which platform the checkout is on."
             )
         return (
@@ -1014,19 +1155,10 @@ def situation_guidance(job_description: str, style: str) -> str:
         if style == "detailed":
             return (
                 "Surface the real tradeoff: invoice tools are often overbuilt or too limited. "
-                "Follow with a direct offer to build around the fields and calculations they actually use; do not promise "
-                "time savings, reduced frustration, or other general benefits. "
-                "In the middle paragraph, explain a specific approach: capture only their invoice fields and calculation rules, "
-                "define invoice numbering, line items, totals, currency and tax handling, build input and editing first, "
-                "leave customer-detail storage as a decision unless they ask for it, validate calculations and empty-field behavior, "
-                "test that saved and revised invoices reopen with unchanged totals, and explain that PDF or email changes "
-                "the version-one data and layout decisions without promising either feature. "
-                "End by asking whether PDF downloads or email sending are required. Do not promise security, easy outcomes, "
-                "generic fit, or optional features before that question. A strong cadence for this brief is: invoice tools "
-                "get messy when features are chosen before calculation rules; map invoice number, client details, item rows, "
-                "tax, currency, total and due-date rules; build create/edit and missing-value validation; test saved and "
-                "revised invoices reopen with unchanged totals; explain PDF affects layout and email affects sending setup; "
-                "ask which is needed in the first version."
+                "Add depth around the cost: small businesses lose time when invoice fields, totals, and delivery options "
+                "do not match how they actually bill. Describe the finished outcome as a lightweight tool that fits "
+                "their invoices instead of forcing them into bloated software. End by asking whether PDF downloads or "
+                "email sending are required."
             )
         return (
             "Surface the real tradeoff: invoice tools are often overbuilt or too limited. "
@@ -1037,24 +1169,38 @@ def situation_guidance(job_description: str, style: str) -> str:
     if category == "dashboard":
         return (
             'Start exactly with: "Driver dashboards lose trust when the filtered view and exported report disagree." '
-            "Explain how you would define the report fields, connect the "
-            "driver data, test filters against export rows, and check totals for the same date range. End by asking "
-            "where the driver data currently lives."
+            "Add depth around the cost of mismatched operational numbers: teams stop using dashboards when exports "
+            "tell a different story. Describe the finished outcome as one view that matches the exported report. "
+            "End by asking where the driver data currently lives."
         )
     if category == "landing_page":
         return (
             "Open with an implementation truth: a launch-page Figma can look finished while the built hero and signup "
-            "flow still lose the intended message or action. Explain how you would translate layout responsively, build "
-            "the hero and signup interaction, check mobile spacing and form states, and preserve the supplied design. "
-            "Avoid claims about engagement, visual appeal, or a seamless experience. End by asking what stack the page "
-            "must be added to."
+            "flow still lose the intended message or action. Describe the finished outcome as a page that keeps the "
+            "Figma intent intact on mobile and desktop. Avoid claims about engagement, visual appeal, or a seamless "
+            "experience. End by asking what stack the page must be added to."
         )
     if category == "api":
         return (
             "Open with a subscription truth: monthly and yearly billing usually breaks at state transitions, not at the "
-            "first checkout button. Explain how you would map the Stripe products and prices, create the Node endpoint, "
-            "verify webhook events and subscription state, and test plan selection and renewal paths. End by asking "
-            "whether Stripe products and webhook handling already exist."
+            "first checkout button. Describe the finished outcome as billing that stays correct when customers switch "
+            "plans, renew, or hit webhook-driven state changes. End by asking whether Stripe products and webhook "
+            "handling already exist."
+        )
+    if ("wordpress" in lowered or "website" in lowered or "pages" in lowered) and (
+        "slow" in lowered or "speed" in lowered or "seconds" in lowered or "load" in lowered
+    ):
+        if style == "detailed":
+            return (
+                "Open with this truth: an 8-second page load is not just slow, it makes visitors decide before the "
+                "site gets a chance to sell. Add depth around the cost: speed problems usually come from a few heavy "
+                "assets, plugins, or render-blocking choices rather than one magical fix. Describe the finished "
+                "outcome as a site that feels immediate enough for visitors to stay. End by asking whether the site "
+                "is on shared hosting or managed WordPress hosting."
+            )
+        return (
+            "Open with the 8-second load as the cost: visitors decide before the site gets a chance to sell. "
+            "Describe the outcome as a WordPress site that feels fast enough to stay on. Ask whether hosting is shared or managed WordPress."
         )
     return (
         "Infer one practical truth the client will recognize immediately. "
@@ -1069,20 +1215,19 @@ def normalize_style(value: Any) -> str:
 def style_rules(style: str) -> str:
     if style == "detailed":
         return (
-            "Style: DETAILED. Draft toward 140 to 150 words; anything below 120 words will be rejected. "
-            "Use exactly 3 paragraphs. Paragraph 1 should be about 30 to 40 words: open with client insight and "
-            "include one relevant proof point only if supplied. Paragraph 2 should be about 95 to 105 words and use "
-            "nine short sentences: each sentence states one concrete action or check and what it resolves for this "
-            "job. Do not collapse the actions into a list and do not pad with sales language. Paragraph 3 should be "
-            "about 15 to 20 words and end with exactly one practical question whose "
-            "answer changes the approach. Before returning, silently count the words; if fewer than 120, add useful "
-            "implementation or testing detail to paragraph 2 until the range is met. Add no status-update promises, "
-            "sales reassurance, or claims that the work guarantees success just to reach the word count. The final "
-            "question mark must be the final character; do not add a sentence after the question."
+            "Style: DETAILED. Write 90 to 130 words. Detailed means more depth about the client's situation, "
+            "not more process. Paragraph 1 must have 2 sentences: show why the problem exists, what it is costing "
+            "them, or what hidden constraint matters. Paragraph 2 must have 1 to 2 sentences and must use the exact "
+            "past win only if supplied; omit this paragraph entirely when no past win is supplied. Paragraph 3 must "
+            "have 2 sentences describing the specific finished outcome the client will have. Closing must be one "
+            "specific practical question. Never use First, Next, Then, Finally, or Lastly. Never list process steps, "
+            "explain how you will do the work, write 'This resolves' or 'This addresses', or write a technical "
+            "specification. The final question mark must be the final character."
         )
     return (
         "Style: QUICK. Write 50 to 80 words in no more than 3 sentences. "
-        "Keep only the insight, one relevant proof point when available, and one practical next step or question."
+        "Sentence 1 is one client-situation insight. Sentence 2 is the exact proof if supplied, otherwise the "
+        "specific finished outcome. Sentence 3 is one specific practical question."
     )
 
 

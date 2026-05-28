@@ -583,7 +583,7 @@
       <div class="setup-layout">
         <div class="intro">
           <h1>Turn any job post into a proposal you can send.</h1>
-          <p class="intro-copy">Save your freelancer profile once. ProposalAI uses it to draft client-first proposals with your voice and most relevant proof.</p>
+          <p class="intro-copy">Save your freelancer profile once. ProposalAI uses it to draft client-first proposals with your voice and optional proof.</p>
           <div class="proof-list" aria-label="ProposalAI workflow">
             <div class="proof-item"><span class="proof-dot"></span><span>Profile is saved locally, without an account.</span></div>
             <div class="proof-item"><span class="proof-dot"></span><span>No API key field for users.</span></div>
@@ -635,8 +635,8 @@
             </label>
 
             <label>
-              One past win or success story
-              <textarea id="pastWin" rows="4" required placeholder="Helped a service business turn a slow website into a faster page that generated more consultation requests."></textarea>
+              One past win or success story (optional)
+              <textarea id="pastWin" rows="4" placeholder="Fixed Shopify checkout, reduced drop-offs by 40%"></textarea>
             </label>
 
             <label>
@@ -686,7 +686,7 @@
                 <label class="style-choice">
                   <input type="radio" name="proposalStyle" value="detailed" />
                   <span class="style-title">Detailed</span>
-                  <span class="style-description">120-150 words. Adds the approach.</span>
+                  <span class="style-description">90-130 words. Adds client depth.</span>
                 </label>
               </div>
             </fieldset>
@@ -804,7 +804,6 @@
       if (!profile.niche) missing.push("niche");
       if (!profile.experience) missing.push("experience");
       if (profile.skills.some((skill) => !skill)) missing.push("top 3 skills");
-      if (!profile.pastWin) missing.push("past win");
       if (!profile.rate) missing.push("rate");
       return missing;
     }

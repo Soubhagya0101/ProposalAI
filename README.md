@@ -30,9 +30,9 @@ openai/gpt-4o-mini
 Proposal style rules are applied server-side: an insightful client-first opening, one relevant win at most, profile/job-fit protection, and at most one essential question. Past wins are only supplied when their work category matches the job, so an ecommerce result is not inserted into dashboard, landing-page, or API work.
 
 - `Quick` (default): 50-80 words, at most three sentences.
-- `Detailed`: 120-150 words with a concrete approach paragraph and one closing question.
+- `Detailed`: 90-130 words with deeper client-situation context and one closing question.
 
-Minor wording or length findings are logged without hiding a usable draft. The server still blocks direct job-description echo openings, bracket placeholders, unsupported numeric/timing claims, unrelated past-result claims, or drafts containing three or more banned/filler phrases. Transient generation failures are shown to users as a simple retry message rather than raw provider errors.
+The server blocks direct job-description echo openings, bracket placeholders, unsupported numeric/timing claims, unrelated or invented past-result claims, banned phrases, and drafts outside the selected word range. Transient generation failures are shown to users as a simple retry message rather than raw provider errors.
 
 ## Feedback
 
