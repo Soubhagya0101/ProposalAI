@@ -199,6 +199,21 @@ PROOF_CATEGORIES = {
     "landing_page": ("landing", "hero", "figma", "saas launch", "signup"),
     "api": ("stripe", "api", "integration", "webhook", "node.js", "node"),
 }
+CONTROLLED_CONTEXT_TERMS = (
+    "figma",
+    "signup flow",
+    "sign-up flow",
+    "signup",
+    "sign-up",
+    "crm",
+    "stripe",
+    "dashboard",
+    "mobile app",
+    "web app",
+    "wordpress",
+    "woocommerce",
+    "shopify",
+)
 RELEVANCE_STOPWORDS = {
     "a",
     "an",
@@ -326,12 +341,11 @@ class ProposalAIHandler(BaseHTTPRequestHandler):
 
 
 def generate_proposal(body: dict[str, Any], test_mode: bool = False) -> ApiResult:
-    token = github_models_token()
-    if not token:
-        print("[ProposalAI] Generation token is not configured.", flush=True)
-        return error(USER_RETRY_MESSAGE, 503)
-
     if test_mode:
+        token = github_models_token()
+        if not token:
+            print("[ProposalAI] Generation token is not configured.", flush=True)
+            return error(USER_RETRY_MESSAGE, 503)
         result = request_github_models(
             token,
             "Reply with exactly this sentence: ProposalAI GitHub Models connection works.",
@@ -365,6 +379,11 @@ def generate_proposal(body: dict[str, Any], test_mode: bool = False) -> ApiResul
             },
         )
 
+    token = github_models_token()
+    if not token:
+        print("[ProposalAI] Generation token is not configured.", flush=True)
+        return error(USER_RETRY_MESSAGE, 503)
+
     relevant_win = select_relevant_win(profile["pastWin"], job_description)
     guidance = situation_guidance(job_description, style)
     prompt = build_prompt(profile, job_description, relevant_win, guidance, style)
@@ -385,15 +404,18 @@ def generate_proposal(body: dict[str, Any], test_mode: bool = False) -> ApiResul
                     "- Open immediately with a concrete detail from the client's job, not a greeting or an introduction about the freelancer.",
                     "- The opening must add an observation the client did not write but will immediately recognize as true. Never merely restate the brief.",
                     "- State facts and outcomes. Do not explain that the project is important, beneficial, impactful, or engaging.",
-                    "- Every sentence must state client insight, the exact allowed proof, the finished outcome, or one necessary decision question.",
+                    "- Every sentence must state client insight, allowed proof, the finished outcome, or one necessary decision question.",
                     "- For detailed mode, add depth about why the problem exists, what it is costing them, and what outcome they get. Do not list your methodology.",
-                    "- If an allowed past win exists, include its exact text exactly once as its own proof paragraph. If no allowed past win exists, skip proof completely.",
+                    "- Past win rule: If the freelancer profile includes a past win/success story, compare it to the job description. When it is relevant to the job's platform, service, skill, industry, or outcome, include it naturally as one short proof sentence. Do not force it if unrelated. If relevant, mention the concrete outcome/metric from the past win.",
+                    "- If an allowed past win exists, include it naturally once as a proof sentence. If no allowed past win exists, skip proof completely.",
                     (
-                        f"- The exact required proof paragraph is: {relevant_win}"
+                        f"- Relevant past win to weave in naturally: {relevant_win}"
                         if relevant_win
                         else "- No past win is supplied for this job. Do not claim any previous result, similar project, client, or metric."
                     ),
                     "- Do not invent clients, industries, metrics, timelines, or outcomes.",
+                    "- Only mention tools, platforms, or features that appear explicitly in the job description or the freelancer profile. Never invent context.",
+                    "- If a tool, platform, or feature is not explicitly present, speak generally instead of naming it.",
                     "- Do not borrow facts from the style example; use only the job description and allowed past win.",
                     "- Do not mention years of experience. Use concrete proof or a concrete approach instead.",
                     "- Ask at most one question and only when the answer changes the work.",
@@ -788,14 +810,14 @@ def build_prompt(profile: dict[str, Any], job_description: str, relevant_win: st
     if profile["skills"]:
         profile_lines.append(f"Skills: {', '.join(profile['skills'])}")
     if relevant_win:
-        profile_lines.append(f"Past win to include exactly once: {relevant_win}")
+        profile_lines.append(f"Relevant past win: {relevant_win}")
     else:
         profile_lines.append("Past win: none. Skip proof completely. Do not invent prior work.")
     if profile["rate"]:
         profile_lines.append(f"Rate: {profile['rate']}")
     return "\n".join(
         [
-            "Write a ready-to-send proposal for this freelance job.",
+            "Write a proposal draft to edit for this freelance job.",
             style_rules(style),
             "",
             "Non-negotiable rules:",
@@ -804,8 +826,11 @@ def build_prompt(profile: dict[str, Any], job_description: str, relevant_win: st
             "- The opener must show you understand the situation: why this problem exists, what it is costing them, or what constraint matters.",
             "- Never restate the job description as the opening line.",
             "- The first sentence must not contain I, I'm, my, or me. Do not begin with a greeting or a description of the freelancer.",
-            "- If a past win is provided, include it as its own proof paragraph using the exact past win text. Do not add timing like last month or recently.",
-            "- If no past win is provided, skip the proof paragraph completely.",
+            "- Only mention tools, platforms, or features that appear explicitly in the job description or the freelancer profile. Never invent context.",
+            "- Ground every specific claim in either the job description or the freelancer profile. If a tool, platform, or feature is not explicitly present, speak generally instead of naming it.",
+            "- Do not add examples like Figma, signup flow, CRM, Stripe, dashboards, apps, etc. unless present in the input.",
+            "- Past win rule: If the freelancer profile includes a past win/success story, compare it to the job description. When it is relevant to the job's platform, service, skill, industry, or outcome, include it naturally as one short proof sentence. Do not force it if unrelated. Do not copy the past win as a separate case study; weave it into the proposal. If relevant, mention the concrete outcome/metric from the past win.",
+            "- If no relevant past win is provided, skip the proof sentence completely.",
             "- Never write 'I have worked on similar projects' or invent a replacement proof point.",
             "- Never invent a past result, number, client, industry, timeline, or outcome that is not in the profile.",
             "- Do not mention years of experience. A short proposal has no room for background padding.",
@@ -855,7 +880,7 @@ def build_fallback_prompt(
     style: str,
 ) -> str:
     proof_rule = (
-        f"Use this exact proof paragraph once, unchanged: {relevant_win}"
+        f"Use this relevant past win naturally as one short proof sentence, keeping its concrete metric/outcome when possible: {relevant_win}"
         if relevant_win
         else "No past win is supplied. Skip proof completely. Do not mention similar projects, prior results, clients, or metrics."
     )
@@ -863,7 +888,7 @@ def build_fallback_prompt(
         [
             "Detailed mode is 90 to 130 words.",
             "Paragraph 1: exactly 2 sentences with an insight about why the client's situation is risky or costly.",
-            "Paragraph 2: 1 to 2 sentences of exact past-win proof only if supplied; otherwise omit this paragraph.",
+            "Paragraph 2: 1 to 2 sentences of relevant past-win proof only if supplied; otherwise omit this paragraph.",
             "Paragraph 3: exactly 2 sentences describing the finished outcome the client will have.",
             "Closing: one specific practical question.",
             "Do not list steps, explain methodology, or write a technical specification.",
@@ -882,6 +907,8 @@ def build_fallback_prompt(
             style_rules(style),
             *format_instructions,
             "No greeting. No general benefits. No invented deliverables. No years of experience.",
+            "Only mention tools, platforms, or features that appear explicitly in the job description or the freelancer profile. Never invent context.",
+            "If a tool, platform, or feature is not explicitly present, speak generally instead of naming it.",
             f"Never use: {', '.join(FORBIDDEN_PHRASES + GENERIC_FILLER)}.",
             proof_rule,
             "Return only the message.",
@@ -971,7 +998,14 @@ def proposal_violations(
     if "invoice" in lowered_job and re.match(r"^\s*invoice (?:tools|generators?)\s+can\s+(?:often\s+)?be\b", lowered):
         violations.append("passive invoice opener used instead of a direct observation")
     if profile is not None:
-        allowed_source = "\n".join([job_description, relevant_win, profile.get("experience", ""), profile.get("rate", "")])
+        allowed_source = "\n".join([job_description, profile.get("niche", ""), " ".join(profile.get("skills", [])), relevant_win, profile.get("experience", ""), profile.get("rate", "")])
+        invented_context = [
+            term
+            for term in CONTROLLED_CONTEXT_TERMS
+            if category_marker_present(term, lowered) and not category_marker_present(term, allowed_source.lower())
+        ]
+        if invented_context:
+            violations.append(f"invented tool/platform/feature: {', '.join(invented_context)}")
         generated_numbers = numeric_tokens(proposal)
         allowed_numbers = numeric_tokens(allowed_source)
         unsupported_numbers = sorted(generated_numbers - allowed_numbers)
@@ -983,8 +1017,8 @@ def proposal_violations(
             violations.append(f"unsupported timing claim: {', '.join(unsupported_timing)}")
         if profile.get("pastWin") and not relevant_win and claims_unrelated_past_win(proposal, profile["pastWin"]):
             violations.append("past win is unrelated to this job and must be omitted")
-        if relevant_win and relevant_win.lower() not in lowered:
-            violations.append("exact past win is missing")
+        if relevant_win and not past_win_covered(proposal, relevant_win):
+            violations.append("relevant past win is missing")
         if not relevant_win and re.search(r"\b(?:similar projects?|worked on similar|past projects?|previous projects?|previously worked)\b", lowered):
             violations.append("invented similar-project proof used without a past win")
     return violations
@@ -1008,11 +1042,12 @@ def blocking_violations(proposal: str, findings: list[str]) -> list[str]:
             or finding == "bracket placeholder present"
             or finding.startswith("banned wording used:")
             or finding.startswith("unsupported numeric claim:")
+            or finding.startswith("invented tool/platform/feature:")
             or finding.startswith("unsupported timing claim:")
             or finding.startswith("quick draft has ")
             or finding.startswith("detailed draft has ")
             or finding == "past win is unrelated to this job and must be omitted"
-            or finding == "exact past win is missing"
+            or finding == "relevant past win is missing"
             or finding == "invented similar-project proof used without a past win"
             or finding == "detailed draft lists process steps"
             or finding == "detailed draft explains methodology instead of client depth"
@@ -1026,7 +1061,13 @@ def select_relevant_win(past_win: str, job_description: str) -> str:
         return ""
     win_category = classify_proof_category(past_win)
     job_category = classify_proof_category(job_description)
-    return past_win if win_category and win_category == job_category else ""
+    if win_category and job_category and win_category == job_category:
+        return past_win
+    # Also allow proof when the win and job share explicit platform/service/skill/outcome words.
+    # This catches cases like a Shopify checkout win for a Shopify landing-page job even when
+    # the specific task categories differ.
+    shared_terms = meaningful_tokens(past_win).intersection(meaningful_tokens(job_description))
+    return past_win if shared_terms else ""
 
 
 def classify_proof_category(text: str) -> str | None:
@@ -1081,6 +1122,20 @@ def claims_unrelated_past_win(proposal: str, past_win: str) -> bool:
 def meaningful_tokens(text: str) -> set[str]:
     tokens = set(re.findall(r"[a-z][a-z0-9-]{3,}", text.lower()))
     return tokens - RELEVANCE_STOPWORDS
+
+
+def past_win_covered(proposal: str, past_win: str) -> bool:
+    proposal_lower = proposal.lower()
+    win_lower = past_win.lower()
+    if win_lower in proposal_lower:
+        return True
+    win_numbers = numeric_tokens(past_win)
+    if win_numbers and not win_numbers.issubset(numeric_tokens(proposal)):
+        return False
+    win_terms = meaningful_tokens(past_win)
+    proposal_terms = meaningful_tokens(proposal)
+    shared_terms = win_terms.intersection(proposal_terms)
+    return bool(shared_terms) and (not win_numbers or win_numbers.issubset(numeric_tokens(proposal)))
 
 
 def detect_domains(text: str) -> set[str]:

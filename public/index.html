@@ -702,7 +702,7 @@
         <section class="panel output-box">
           <div class="output-toolbar">
             <div>
-              <h2>Ready-to-send draft</h2>
+              <h2>Draft to edit</h2>
               <div class="output-meta" id="outputMeta">No proposal generated yet.</div>
             </div>
             <button class="btn btn-secondary hidden" id="copyBtn" type="button">Copy</button>
@@ -738,6 +738,8 @@
     const API_PATH = "/api/generate-proposal";
     const FEEDBACK_API_PATH = "/api/feedback";
     const RETRY_MESSAGE = "Taking longer than usual - please try again.";
+    const MAX_GENERATION_ATTEMPTS = 3;
+    const RETRYABLE_STATUS_CODES = new Set([408, 429, 500, 502, 503, 504]);
 
     const profileScreen = document.getElementById("profileScreen");
     const appScreen = document.getElementById("appScreen");
@@ -864,6 +866,60 @@
       return document.querySelector('input[name="proposalStyle"]:checked')?.value || "quick";
     }
 
+    function sleep(ms) {
+      return new Promise((resolve) => window.setTimeout(resolve, ms));
+    }
+
+    async function requestProposal(payload) {
+      let lastError = null;
+      for (let attempt = 1; attempt <= MAX_GENERATION_ATTEMPTS; attempt += 1) {
+        try {
+          const response = await fetch(API_PATH, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+          });
+          const raw = await response.text();
+          let data = {};
+          if (raw.trim()) {
+            try {
+              data = JSON.parse(raw);
+            } catch {
+              throw new Error(`Server returned non-JSON response (${response.status}): ${raw.slice(0, 220)}`);
+            }
+          }
+          if (!response.ok) {
+            if (data.code === "PROFILE_MISMATCH") {
+              const error = new Error(data.error);
+              error.nonRetryable = true;
+              throw error;
+            }
+            if (RETRYABLE_STATUS_CODES.has(response.status) && attempt < MAX_GENERATION_ATTEMPTS) {
+              setStatus(generateStatus, `Still working... retrying ${attempt + 1}/${MAX_GENERATION_ATTEMPTS}.`);
+              await sleep(700 * attempt);
+              continue;
+            }
+            const error = new Error(RETRY_MESSAGE);
+            error.nonRetryable = !RETRYABLE_STATUS_CODES.has(response.status);
+            throw error;
+          }
+          return data;
+        } catch (error) {
+          lastError = error;
+          const message = String(error?.message || "");
+          if (error?.nonRetryable || message.startsWith("Profile mismatch:")) {
+            throw error;
+          }
+          if (attempt < MAX_GENERATION_ATTEMPTS) {
+            setStatus(generateStatus, `Still working... retrying ${attempt + 1}/${MAX_GENERATION_ATTEMPTS}.`);
+            await sleep(700 * attempt);
+            continue;
+          }
+        }
+      }
+      throw lastError || new Error(RETRY_MESSAGE);
+    }
+
     function resetFeedback() {
       feedbackSelection = "";
       feedbackContext = null;
@@ -945,26 +1001,7 @@
       resetFeedback();
 
       try {
-        const response = await fetch(API_PATH, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ profile, jobDescription: job, style: selectedStyle() })
-        });
-        const raw = await response.text();
-        let data = {};
-        if (raw.trim()) {
-          try {
-            data = JSON.parse(raw);
-          } catch {
-            throw new Error(`Server returned non-JSON response (${response.status}): ${raw.slice(0, 220)}`);
-          }
-        }
-        if (!response.ok) {
-          if (data.code === "PROFILE_MISMATCH") {
-            throw new Error(data.error);
-          }
-          throw new Error(RETRY_MESSAGE);
-        }
+        const data = await requestProposal({ profile, jobDescription: job, style: selectedStyle() });
         const proposal = String(data.proposal || "").trim();
         if (!proposal) {
           throw new Error(RETRY_MESSAGE);
