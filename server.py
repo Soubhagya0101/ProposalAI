@@ -735,7 +735,7 @@ def build_rule_based_proposal(job_description: str, relevant_win: str, style: st
                 f"{question}"
             )
         return (
-            "An 8-second WordPress load time means visitors are deciding whether to leave before your page has a fair chance to make its case. "
+            "The risk with a slow WordPress mobile load is that visitors decide whether to leave before the page has a fair chance to make its case. "
             "You'll have a faster site that feels ready when people land, with the heavy page drag removed from the initial impression. "
             f"{question}"
         )
@@ -782,6 +782,7 @@ def build_rule_based_proposal(job_description: str, relevant_win: str, style: st
 
 
 def job_focus_terms(job_description: str) -> list[str]:
+    lowered = job_description.lower()
     terms = meaningful_tokens(job_description) - {
         "need",
         "needs",
@@ -811,10 +812,11 @@ def job_focus_terms(job_description: str) -> list[str]:
         "about",
     }
     ordered: list[str] = []
+    if "sequence" in lowered or ("email" in lowered and any(term in lowered for term in ("welcome", "campaign", "newsletter", "copy", "subscribers"))):
+        for priority in ("email", "emails", "sequence"):
+            if priority in terms and priority not in ordered:
+                ordered.append(priority)
     priority_terms = (
-        "email",
-        "emails",
-        "sequence",
         "quickbooks",
         "bookkeeping",
         "reconciliation",
@@ -842,7 +844,7 @@ def job_focus_terms(job_description: str) -> list[str]:
 
 def practical_question_for_job(job_description: str, focus_terms: list[str]) -> str:
     lowered = job_description.lower()
-    if "email" in lowered or "sequence" in lowered:
+    if "sequence" in lowered or ("email" in lowered and any(term in lowered for term in ("welcome", "campaign", "newsletter", "copy", "subscribers"))):
         return "What action should the final email ask readers to take?"
     if "video" in lowered or "youtube" in lowered:
         return "Should the edit prioritize retention, Shorts, or captions first?"
