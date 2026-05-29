@@ -381,16 +381,47 @@ def generate_proposal(body: dict[str, Any], test_mode: bool = False) -> ApiResul
         )
 
     token = github_models_token()
-    if not token:
-        print("[ProposalAI] Generation token is not configured.", flush=True)
-        return error(USER_RETRY_MESSAGE, 503)
-
     relevant_win = select_relevant_win(profile["pastWin"], job_description)
     guidance = situation_guidance(job_description, style)
+    if not token:
+        print("[ProposalAI] Generation token is not configured; using rule-based draft.", flush=True)
+        fallback = build_rule_based_proposal(job_description, relevant_win, style)
+        fallback_findings = proposal_violations(fallback, profile, job_description, relevant_win, style)
+        fallback_blockers = blocking_violations(fallback, fallback_findings)
+        if fallback_blockers:
+            print(f"[ProposalAI] Rule-based draft blocked without token: {'; '.join(fallback_blockers)}.", flush=True)
+            return error(USER_RETRY_MESSAGE, 503)
+        return ApiResult(
+            200,
+            {
+                "model": MODEL_ID,
+                "style": style,
+                "proposal": fallback.strip(),
+                "wordCount": word_count(fallback),
+                "fallback": "rule_based_missing_token",
+            },
+        )
+
     prompt = build_prompt(profile, job_description, relevant_win, guidance, style)
     result = request_github_models(token, prompt, temperature=0.42, max_tokens=620 if style == "detailed" else 320)
     if result.status != 200:
-        return result
+        fallback = build_rule_based_proposal(job_description, relevant_win, style)
+        fallback_findings = proposal_violations(fallback, profile, job_description, relevant_win, style)
+        fallback_blockers = blocking_violations(fallback, fallback_findings)
+        if fallback_blockers:
+            print(f"[ProposalAI] Provider failed and rule-based draft blocked: {'; '.join(fallback_blockers)}.", flush=True)
+            return result
+        print(f"[ProposalAI] Provider failed with {result.status}; using rule-based draft.", flush=True)
+        return ApiResult(
+            200,
+            {
+                "model": MODEL_ID,
+                "style": style,
+                "proposal": fallback.strip(),
+                "wordCount": word_count(fallback),
+                "fallback": "rule_based_provider_failure",
+            },
+        )
 
     proposal = clean_proposal(str(result.payload["proposal"]))
     findings = proposal_violations(proposal, profile, job_description, relevant_win, style)
@@ -731,26 +762,101 @@ def build_rule_based_proposal(job_description: str, relevant_win: str, style: st
             f"{proof_or_outcome} {question}"
         )
 
-    question = "What is the main constraint you want handled first?"
+    focus_terms = job_focus_terms(job_description)
+    primary = focus_terms[0] if focus_terms else "this work"
+    secondary = ", ".join(focus_terms[1:4]) if len(focus_terms) > 1 else "the details in the brief"
+    question = practical_question_for_job(job_description, focus_terms)
+    opener = f"The risk in {primary} work is that {secondary} get treated as separate pieces instead of one client outcome."
+    outcome = f"You'll have a draft tied to {', '.join(focus_terms[:4]) if focus_terms else 'the exact brief'}, without adding tools or features the client did not ask for."
+    proof = f"{relevant_win}, so I would keep the proposal grounded in the specific outcome named in the brief."
     if style == "detailed":
-        proof = f"\n\n{relevant_win}." if relevant_win else ""
+        proof_block = f"\n\n{proof}" if relevant_win else ""
         return (
-            "The risk with this kind of build is ending up with something technically complete but not useful in the moment the client needs it. "
-            "The work has to stay tied to the decision, delay, or handoff problem behind the brief."
-            f"{proof}\n\n"
-            "You'll have a first version that focuses on the outcome the job is really asking for, without adding extra surface area. "
-            "That keeps the finished result easier to judge, revise, and use.\n\n"
+            f"{opener} The proposal should make the client feel the brief was read closely, not that a reusable pitch was pasted over it."
+            f"{proof_block}\n\n"
+            f"{outcome} That keeps the message useful across different freelance skills while still sounding specific to this job.\n\n"
             f"{question}"
         )
-    proof_or_outcome = (
-        f"{relevant_win}, so I would keep this tied to the specific outcome in the brief."
-        if relevant_win
-        else "You'll have a focused first version that solves the main outcome without extra surface area."
+    proof_or_outcome = proof if relevant_win else outcome
+    return f"{opener} {proof_or_outcome} {question}"
+
+
+def job_focus_terms(job_description: str) -> list[str]:
+    terms = meaningful_tokens(job_description) - {
+        "need",
+        "needs",
+        "want",
+        "wants",
+        "looking",
+        "someone",
+        "include",
+        "includes",
+        "should",
+        "explain",
+        "build",
+        "trust",
+        "invite",
+        "people",
+        "tasks",
+        "work",
+        "project",
+        "freelancer",
+        "small",
+        "agency",
+        "monthly",
+        "online",
+        "current",
+        "better",
+        "sell",
+        "about",
+    }
+    ordered: list[str] = []
+    priority_terms = (
+        "email",
+        "emails",
+        "sequence",
+        "quickbooks",
+        "bookkeeping",
+        "reconciliation",
+        "video",
+        "youtube",
+        "illustrator",
+        "illustration",
+        "react",
+        "native",
+        "firebase",
+        "dashboard",
+        "looker",
+        "wordpress",
+        "shopify",
     )
-    return (
-        "The risk with this kind of work is ending up with something technically complete but not useful in the moment it is needed. "
-        f"{proof_or_outcome} {question}"
-    )
+    for priority in priority_terms:
+        if priority in terms and priority not in ordered:
+            ordered.append(priority)
+    for token in re.findall(r"[a-z][a-z0-9+.-]+", job_description.lower()):
+        cleaned = token.strip(".-")
+        if cleaned in terms and cleaned not in ordered:
+            ordered.append(cleaned)
+    return ordered[:5]
+
+
+def practical_question_for_job(job_description: str, focus_terms: list[str]) -> str:
+    lowered = job_description.lower()
+    if "email" in lowered or "sequence" in lowered:
+        return "What action should the final email ask readers to take?"
+    if "video" in lowered or "youtube" in lowered:
+        return "Should the edit prioritize retention, Shorts, or captions first?"
+    if "quickbooks" in lowered or "bookkeeping" in lowered or "reconciliation" in lowered:
+        return "Which month should the first reconciliation and report cover?"
+    if "illustration" in lowered or "illustrator" in lowered or "book" in lowered:
+        return "Should the first sketch focus on the main character or one full scene?"
+    if "react native" in lowered or "firebase" in lowered or "notification" in lowered:
+        return "Which bug is blocking users most right now?"
+    if "dashboard" in lowered or "looker" in lowered or "report" in lowered:
+        return "Which metric has to be trusted first in the report?"
+    if focus_terms:
+        return f"Which part of {focus_terms[0]} should be handled first?"
+    return "What constraint matters most for the first draft?"
 
 
 def request_github_models(token: str, prompt: str, temperature: float = 0.7, max_tokens: int = 1300) -> ApiResult:
