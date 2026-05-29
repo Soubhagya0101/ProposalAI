@@ -21,6 +21,7 @@ PUBLIC_DIR = ROOT / "public"
 GITHUB_MODELS_URL = "https://models.github.ai/inference/chat/completions"
 MODEL_ID = "openai/gpt-4o-mini"
 USER_RETRY_MESSAGE = "Taking longer than usual - please try again."
+PROVIDER_MAX_ATTEMPTS = 3
 IST = timezone(timedelta(hours=5, minutes=30))
 FEEDBACK_TYPES = {
     "human": "This sounds human",
@@ -632,6 +633,35 @@ def append_feedback_to_google_sheet(record: dict[str, Any]) -> None:
 
 def build_rule_based_proposal(job_description: str, relevant_win: str, style: str) -> str:
     lowered = job_description.lower()
+    if "landing" in lowered and ("shopify" in lowered or "hero" in lowered or "mobile" in lowered):
+        product = "eco-friendly water bottles" if "water bottle" in lowered else "the product"
+        question = "Should the main call to action send shoppers to the product page, cart, or checkout?"
+        if "shopify" in lowered:
+            opener = (
+                "A Shopify landing page can look clean and still lose buyers when the hero, benefits, "
+                "and mobile call to action fight for attention."
+            )
+        else:
+            opener = (
+                "A landing page can look clean and still lose buyers when the hero, benefits, "
+                "and mobile call to action fight for attention."
+            )
+        outcome = (
+            f"You'll have a page for {product} where the offer is clear, the benefits sell the product, "
+            "and the mobile action is easy to take."
+        )
+        proof = f"{relevant_win}." if relevant_win else ""
+        if style == "detailed":
+            proof_block = f"\n\n{proof}" if proof else ""
+            return (
+                f"{opener} If those pieces compete, visitors understand the product but hesitate before acting."
+                f"{proof_block}\n\n"
+                f"{outcome} The draft should stay focused on the offer in the brief instead of adding extra flows or tools.\n\n"
+                f"{question}"
+            )
+        proof_or_outcome = f"{relevant_win}, so {outcome[0].lower()}{outcome[1:]}" if relevant_win else outcome
+        return f"{opener} {proof_or_outcome} {question}"
+
     if "checkout" in lowered and ("launch" in lowered or "week" in lowered or "deadline" in lowered):
         deadline = re.search(r"\b(\d+)\s*weeks?\b", lowered)
         opener = (
@@ -755,23 +785,33 @@ def request_github_models(token: str, prompt: str, temperature: float = 0.7, max
         method="POST",
     )
 
-    try:
-        with urllib.request.urlopen(request, timeout=70) as response:
-            raw = response.read().decode("utf-8", errors="replace")
-            data = json.loads(raw) if raw.strip() else {}
-    except urllib.error.HTTPError as exc:
-        exc.read()
-        print(f"[ProposalAI] Generation provider returned HTTP {exc.code}.", flush=True)
-        return error(USER_RETRY_MESSAGE, 503)
-    except urllib.error.URLError as exc:
-        print(f"[ProposalAI] Generation network request failed: {type(exc.reason).__name__}.", flush=True)
-        return error(USER_RETRY_MESSAGE, 503)
-    except TimeoutError:
-        print("[ProposalAI] Generation request timed out.", flush=True)
-        return error(USER_RETRY_MESSAGE, 503)
-    except json.JSONDecodeError:
-        print("[ProposalAI] Generation provider returned invalid JSON.", flush=True)
-        return error(USER_RETRY_MESSAGE, 503)
+    data: Any = {}
+    for attempt in range(1, PROVIDER_MAX_ATTEMPTS + 1):
+        try:
+            with urllib.request.urlopen(request, timeout=70) as response:
+                raw = response.read().decode("utf-8", errors="replace")
+                data = json.loads(raw) if raw.strip() else {}
+                break
+        except urllib.error.HTTPError as exc:
+            exc.read()
+            print(f"[ProposalAI] Generation provider returned HTTP {exc.code} on attempt {attempt}.", flush=True)
+            if attempt == PROVIDER_MAX_ATTEMPTS:
+                return error(USER_RETRY_MESSAGE, 503)
+        except urllib.error.URLError as exc:
+            print(
+                f"[ProposalAI] Generation network request failed on attempt {attempt}: {type(exc.reason).__name__}.",
+                flush=True,
+            )
+            if attempt == PROVIDER_MAX_ATTEMPTS:
+                return error(USER_RETRY_MESSAGE, 503)
+        except TimeoutError:
+            print(f"[ProposalAI] Generation request timed out on attempt {attempt}.", flush=True)
+            if attempt == PROVIDER_MAX_ATTEMPTS:
+                return error(USER_RETRY_MESSAGE, 503)
+        except json.JSONDecodeError:
+            print(f"[ProposalAI] Generation provider returned invalid JSON on attempt {attempt}.", flush=True)
+            if attempt == PROVIDER_MAX_ATTEMPTS:
+                return error(USER_RETRY_MESSAGE, 503)
 
     proposal = extract_text(data)
     if not proposal.strip():
@@ -1230,10 +1270,11 @@ def situation_guidance(job_description: str, style: str) -> str:
         )
     if category == "landing_page":
         return (
-            "Open with an implementation truth: a launch-page Figma can look finished while the built hero and signup "
-            "flow still lose the intended message or action. Describe the finished outcome as a page that keeps the "
-            "Figma intent intact on mobile and desktop. Avoid claims about engagement, visual appeal, or a seamless "
-            "experience. End by asking what stack the page must be added to."
+            "Open with an implementation truth: a landing page can look finished while the hero, benefits, and call "
+            "to action still point in different directions. Describe the finished outcome using only the platform, "
+            "product, sections, and constraints named in the brief. Do not mention Figma, signup flows, dashboards, "
+            "apps, or any other tool or feature unless the brief or profile says it. End with one practical question "
+            "about the call to action, product page, mobile layout, or page stack."
         )
     if category == "api":
         return (
@@ -1272,8 +1313,8 @@ def style_rules(style: str) -> str:
         return (
             "Style: DETAILED. Write 90 to 130 words. Detailed means more depth about the client's situation, "
             "not more process. Paragraph 1 must have 2 sentences: show why the problem exists, what it is costing "
-            "them, or what hidden constraint matters. Paragraph 2 must have 1 to 2 sentences and must use the exact "
-            "past win only if supplied; omit this paragraph entirely when no past win is supplied. Paragraph 3 must "
+            "them, or what hidden constraint matters. Paragraph 2 must have 1 to 2 sentences and must use the relevant "
+            "past win naturally only if supplied; omit this paragraph entirely when no past win is supplied. Paragraph 3 must "
             "have 2 sentences describing the specific finished outcome the client will have. Closing must be one "
             "specific practical question. Never use First, Next, Then, Finally, or Lastly. Never list process steps, "
             "explain how you will do the work, write 'This resolves' or 'This addresses', or write a technical "
@@ -1281,7 +1322,7 @@ def style_rules(style: str) -> str:
         )
     return (
         "Style: QUICK. Write 50 to 80 words in no more than 3 sentences. "
-        "Sentence 1 is one client-situation insight. Sentence 2 is the exact proof if supplied, otherwise the "
+        "Sentence 1 is one client-situation insight. Sentence 2 is the relevant proof if supplied, otherwise the "
         "specific finished outcome. Sentence 3 is one specific practical question."
     )
 
