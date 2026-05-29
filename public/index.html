@@ -739,6 +739,7 @@
     const FEEDBACK_API_PATH = "/api/feedback";
     const RETRY_MESSAGE = "Taking longer than usual - please try again.";
     const MAX_GENERATION_ATTEMPTS = 3;
+    const GENERATION_COOLDOWN_MS = 20000;
     const RETRYABLE_STATUS_CODES = new Set([408, 429, 500, 502, 503, 504]);
 
     const profileScreen = document.getElementById("profileScreen");
@@ -763,6 +764,9 @@
     const feedbackStatus = document.getElementById("feedbackStatus");
     let feedbackSelection = "";
     let feedbackContext = null;
+    let isGenerating = false;
+    let generationCooldownUntil = 0;
+    let generationCooldownTimer = null;
 
     const fields = {
       fullName: document.getElementById("fullName"),
@@ -847,15 +851,54 @@
     function updateJobState() {
       const count = jobDescription.value.trim().length;
       charCount.textContent = `${count} character${count === 1 ? "" : "s"}`;
-      generateBtn.disabled = count < MIN_JOB_CHARS;
+      updateGenerateButtonState();
       if (count >= MIN_JOB_CHARS && generateStatus.textContent === "Add at least 50 characters.") {
         setStatus(generateStatus, "");
       }
     }
 
-    function setGenerating(isGenerating) {
-      generateBtn.disabled = isGenerating || jobDescription.value.trim().length < MIN_JOB_CHARS;
-      generateLabel.innerHTML = isGenerating ? '<span class="spinner" aria-hidden="true"></span> Generating...' : "Generate Proposal";
+    function isGenerationCoolingDown() {
+      return Date.now() < generationCooldownUntil;
+    }
+
+    function remainingCooldownSeconds() {
+      return Math.max(0, Math.ceil((generationCooldownUntil - Date.now()) / 1000));
+    }
+
+    function updateGenerateButtonState() {
+      const count = jobDescription.value.trim().length;
+      const isCoolingDown = isGenerationCoolingDown();
+      generateBtn.disabled = isGenerating || isCoolingDown || count < MIN_JOB_CHARS;
+      if (isGenerating) {
+        generateLabel.innerHTML = '<span class="spinner" aria-hidden="true"></span> Generating...';
+      } else if (isCoolingDown) {
+        generateLabel.textContent = `Wait ${remainingCooldownSeconds()}s`;
+      } else {
+        generateLabel.textContent = "Generate Proposal";
+      }
+    }
+
+    function startGenerationCooldown() {
+      generationCooldownUntil = Date.now() + GENERATION_COOLDOWN_MS;
+      if (generationCooldownTimer) {
+        window.clearInterval(generationCooldownTimer);
+      }
+      updateGenerateButtonState();
+      generationCooldownTimer = window.setInterval(() => {
+        if (!isGenerationCoolingDown()) {
+          window.clearInterval(generationCooldownTimer);
+          generationCooldownTimer = null;
+          if (generateStatus.textContent.includes("before generating again")) {
+            setStatus(generateStatus, "");
+          }
+        }
+        updateGenerateButtonState();
+      }, 250);
+    }
+
+    function setGenerating(generating) {
+      isGenerating = generating;
+      updateGenerateButtonState();
     }
 
     function wordCount(text) {
@@ -987,6 +1030,11 @@
         setStatus(generateStatus, "Add at least 50 characters.", "error");
         return;
       }
+      if (isGenerationCoolingDown()) {
+        setStatus(generateStatus, `Wait ${remainingCooldownSeconds()}s before generating again.`);
+        updateGenerateButtonState();
+        return;
+      }
       if (window.location.protocol === "file:") {
         setStatus(generateStatus, "Open the Render website or run the local server first.", "error");
         return;
@@ -1022,6 +1070,12 @@
         setStatus(generateStatus, message.startsWith("Profile mismatch:") ? message : RETRY_MESSAGE, "error");
       } finally {
         setGenerating(false);
+        startGenerationCooldown();
+        if (proposalOutput.classList.contains("empty")) {
+          setStatus(generateStatus, `${generateStatus.textContent} Wait ${remainingCooldownSeconds()}s before generating again.`, "error");
+        } else {
+          setStatus(generateStatus, `Proposal generated. Wait ${remainingCooldownSeconds()}s before generating again.`, "success");
+        }
       }
     }
 
