@@ -19,7 +19,10 @@ from urllib.parse import parse_qs, quote, unquote, urlencode, urlparse
 ROOT = Path(__file__).resolve().parent
 PUBLIC_DIR = ROOT / "public"
 GITHUB_MODELS_URL = "https://models.github.ai/inference/chat/completions"
-MODEL_ID = "openai/gpt-4o-mini"
+BLUESMINDS_MODELS_URL = "https://api.bluesminds.com/v1/chat/completions"
+GITHUB_MODEL_ID = "openai/gpt-4o-mini"
+BLUESMINDS_MODEL_ID = "gpt-4o-mini"
+MODEL_ID = BLUESMINDS_MODEL_ID
 USER_RETRY_MESSAGE = "Taking longer than usual - please try again."
 PROVIDER_MAX_ATTEMPTS = 3
 IST = timezone(timedelta(hours=5, minutes=30))
@@ -355,7 +358,7 @@ def generate_proposal(body: dict[str, Any], test_mode: bool = False) -> ApiResul
         )
         if result.status != 200:
             return result
-        return ApiResult(200, {"ok": True, "model": MODEL_ID, "response": result.payload["proposal"]})
+        return ApiResult(200, {"ok": True, "model": generation_model_id(), "response": result.payload["proposal"]})
 
     profile = normalize_profile(body.get("profile"))
     job_description = trim(body.get("jobDescription"))
@@ -394,7 +397,7 @@ def generate_proposal(body: dict[str, Any], test_mode: bool = False) -> ApiResul
         return ApiResult(
             200,
             {
-                "model": MODEL_ID,
+                "model": generation_model_id(),
                 "style": style,
                 "proposal": fallback.strip(),
                 "wordCount": word_count(fallback),
@@ -415,7 +418,7 @@ def generate_proposal(body: dict[str, Any], test_mode: bool = False) -> ApiResul
         return ApiResult(
             200,
             {
-                "model": MODEL_ID,
+                "model": generation_model_id(),
                 "style": style,
                 "proposal": fallback.strip(),
                 "wordCount": word_count(fallback),
@@ -506,7 +509,7 @@ def generate_proposal(body: dict[str, Any], test_mode: bool = False) -> ApiResul
     if warnings:
         print(f"[ProposalAI] Draft accepted with warnings: {'; '.join(warnings)}.", flush=True)
 
-    return ApiResult(200, {"model": MODEL_ID, "style": style, "proposal": proposal.strip(), "wordCount": word_count(proposal)})
+    return ApiResult(200, {"model": generation_model_id(), "style": style, "proposal": proposal.strip(), "wordCount": word_count(proposal)})
 
 
 def save_feedback(body: dict[str, Any]) -> ApiResult:
@@ -874,8 +877,9 @@ def practical_question_for_job(job_description: str, focus_terms: list[str]) -> 
 
 
 def request_github_models(token: str, prompt: str, temperature: float = 0.7, max_tokens: int = 1300) -> ApiResult:
+    provider_name, api_url, model_id = generation_provider_config()
     payload = {
-        "model": MODEL_ID,
+        "model": model_id,
         "temperature": temperature,
         "max_tokens": max_tokens,
         "messages": [
@@ -893,15 +897,19 @@ def request_github_models(token: str, prompt: str, temperature: float = 0.7, max
             {"role": "user", "content": prompt},
         ],
     }
+    headers = {
+        "Accept": "application/json",
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json",
+    }
+    if provider_name == "github":
+        headers["Accept"] = "application/vnd.github+json"
+        headers["X-GitHub-Api-Version"] = "2022-11-28"
+
     request = urllib.request.Request(
-        GITHUB_MODELS_URL,
+        api_url,
         data=json.dumps(payload).encode("utf-8"),
-        headers={
-            "Accept": "application/vnd.github+json",
-            "Authorization": f"Bearer {token}",
-            "Content-Type": "application/json",
-            "X-GitHub-Api-Version": "2022-11-28",
-        },
+        headers=headers,
         method="POST",
     )
 
@@ -1255,16 +1263,14 @@ def category_marker_present(marker: str, text: str) -> bool:
 
 
 def profile_mismatch(profile: dict[str, Any], job_description: str) -> dict[str, str] | None:
-    profile_text = " ".join(
-        [profile.get("niche", ""), " ".join(profile.get("skills", [])), profile.get("pastWin", "")]
-    )
-    profile_domains = detect_domains(profile_text)
-    job_domains = detect_domains(job_description)
-    if not profile_domains or not job_domains or profile_domains.intersection(job_domains):
-        return None
-    job_domain = sorted(job_domains)[0]
-    labels = {"development": "development", "writing": "writing", "design": "design", "video": "video editing"}
-    return {"job_label": labels.get(job_domain, job_domain)}
+    """Avoid hard-blocking broad public tests by category.
+
+    Freelancers often test across adjacent services, and the market is much
+    wider than a few fixed labels. A wrong block is worse than a slightly rough
+    draft, especially while ProposalAI is collecting public feedback. Keep this
+    hook for future warnings, but do not reject generation here.
+    """
+    return None
 
 
 def claims_unrelated_past_win(proposal: str, past_win: str) -> bool:
@@ -1518,11 +1524,32 @@ def extract_text(data: Any) -> str:
 
 def github_models_token() -> str:
     load_dotenv()
-    for name in ("GITHUB_MODELS_TOKEN", "GITHUB_PAT", "GITHUB_TOKEN"):
+    for name in ("BLUESMINDS_API_KEY", "GENERATION_API_KEY", "GITHUB_MODELS_TOKEN", "GITHUB_PAT", "GITHUB_TOKEN"):
         value = os.getenv(name, "").strip()
         if value:
             return value
     return ""
+
+
+def generation_provider_config() -> tuple[str, str, str]:
+    """Return provider name, OpenAI-compatible chat completions URL, and model id.
+
+    BlueMinds is preferred when its key is present. GitHub Models remains as a
+    fallback so local tests and older Render env vars keep working until the new
+    public-test key is added.
+    """
+    load_dotenv()
+    explicit_url = os.getenv("GENERATION_API_URL", "").strip()
+    explicit_model = os.getenv("GENERATION_MODEL_ID", "").strip()
+    if explicit_url:
+        return "custom", explicit_url, explicit_model or MODEL_ID
+    if os.getenv("BLUESMINDS_API_KEY", "").strip() or os.getenv("GENERATION_API_KEY", "").strip():
+        return "bluesminds", BLUESMINDS_MODELS_URL, explicit_model or BLUESMINDS_MODEL_ID
+    return "github", GITHUB_MODELS_URL, explicit_model or GITHUB_MODEL_ID
+
+
+def generation_model_id() -> str:
+    return generation_provider_config()[2]
 
 
 def load_dotenv(path: str | Path = ".env") -> None:

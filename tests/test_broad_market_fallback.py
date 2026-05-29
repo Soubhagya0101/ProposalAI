@@ -61,3 +61,31 @@ def test_provider_failure_can_return_valid_rule_based_draft(monkeypatch):
     proposal = result.payload["proposal"]
     assert "email" in proposal.lower() or "sequence" in proposal.lower() or "subscribers" in proposal.lower()
     assert result.payload.get("fallback") == "rule_based_provider_failure"
+
+
+def test_broad_public_test_does_not_block_adjacent_freelance_categories(monkeypatch):
+    profile = {
+        "fullName": "SK Test",
+        "niche": "Freelance operator across web, content, automation, and business support",
+        "experience": "5 years",
+        "tone": "Friendly",
+        "skills": ["Client communication", "Project execution", "Fast research"],
+        "pastWin": "Helped clients turn unclear requirements into practical deliverables.",
+        "rate": "$40/hr",
+    }
+    jobs = [
+        "Need a short-form video editor for 20 reels from podcast clips. Add captions, hooks, simple b-roll, and deliver in vertical format.",
+        "Looking for a UI designer to redesign our SaaS onboarding flow in Figma, improve empty states, and make mobile screens cleaner.",
+        "Ecommerce brand needs weekend customer support help. Reply to refund, shipping, and product questions using our tone guide.",
+    ]
+    monkeypatch.setattr(server, "github_models_token", lambda: "test-token")
+    monkeypatch.setattr(
+        server,
+        "request_github_models",
+        lambda *args, **kwargs: server.error(server.USER_RETRY_MESSAGE, 503),
+    )
+
+    for job in jobs:
+        result = server.generate_proposal({"profile": profile, "jobDescription": job, "style": "quick"})
+        assert result.status == 200
+        assert result.payload.get("fallback") == "rule_based_provider_failure"
