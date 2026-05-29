@@ -1023,8 +1023,12 @@ def proposal_violations(
     if re.match(r"^\s*(?:i\b|i[' ]?m\b|i am\b|my\b|as a\b|with \d+)", opening, flags=re.I):
         violations.append("opening is about the freelancer instead of the client")
     first_sentence = re.split(r"(?<=[.!?])\s+", opening.strip(), maxsplit=1)[0]
+    if generic_freelancer_first_opener(first_sentence):
+        violations.append("generic freelancer-first opener used")
     if re.search(r"\b(?:i|i'm|i am|me|my)\b", first_sentence, flags=re.I):
         violations.append("first sentence mentions the freelancer")
+    if job_description and not first_sentence_has_job_specific_noun(first_sentence, job_description):
+        violations.append("first sentence lacks a job-specific noun")
     if opening_echoes_brief(first_sentence, job_description):
         violations.append("opening only echoes the job description instead of adding insight")
     lowered_job = job_description.lower()
@@ -1079,6 +1083,8 @@ def blocking_violations(proposal: str, findings: list[str]) -> list[str]:
     for finding in findings:
         if (
             finding == "opening only echoes the job description instead of adding insight"
+            or finding == "generic freelancer-first opener used"
+            or finding == "first sentence lacks a job-specific noun"
             or finding == "bracket placeholder present"
             or finding.startswith("banned wording used:")
             or finding.startswith("unsupported numeric claim:")
@@ -1176,6 +1182,37 @@ def past_win_covered(proposal: str, past_win: str) -> bool:
     proposal_terms = meaningful_tokens(proposal)
     shared_terms = win_terms.intersection(proposal_terms)
     return bool(shared_terms) and (not win_numbers or win_numbers.issubset(numeric_tokens(proposal)))
+
+
+def generic_freelancer_first_opener(first_sentence: str) -> bool:
+    return bool(
+        re.match(
+            r"^\s*(?:hi\b[^.!?]{0,80})?(?:i\s+can\s+help|i[' ]?m\s+(?:an?\s+)?(?:experienced|skilled|professional)|i\s+have\s+\d+|with\s+\d+\s+years|as\s+an?\s+)",
+            first_sentence,
+            flags=re.I,
+        )
+    )
+
+
+def first_sentence_has_job_specific_noun(first_sentence: str, job_description: str) -> bool:
+    sentence_terms = meaningful_tokens(first_sentence)
+    job_terms = meaningful_tokens(job_description) - {
+        "need",
+        "needs",
+        "want",
+        "wants",
+        "looking",
+        "someone",
+        "help",
+        "improve",
+        "redesign",
+        "section",
+        "benefits",
+        "layout",
+        "action",
+        "description",
+    }
+    return bool(sentence_terms.intersection(job_terms))
 
 
 def detect_domains(text: str) -> set[str]:
