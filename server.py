@@ -767,7 +767,10 @@ def build_rule_based_proposal(job_description: str, relevant_win: str, style: st
     secondary = ", ".join(focus_terms[1:4]) if len(focus_terms) > 1 else "the details in the brief"
     question = practical_question_for_job(job_description, focus_terms)
     opener = f"The risk in {primary} work is that {secondary} get treated as separate pieces instead of one client outcome."
-    outcome = f"You'll have a draft tied to {', '.join(focus_terms[:4]) if focus_terms else 'the exact brief'}, without adding tools or features the client did not ask for."
+    outcome = (
+        f"You'll have a focused proposal draft tied to {', '.join(focus_terms[:4]) if focus_terms else 'the exact brief'}, "
+        "without adding tools, platforms, or features the client did not ask for."
+    )
     proof = f"{relevant_win}, so I would keep the proposal grounded in the specific outcome named in the brief."
     if style == "detailed":
         proof_block = f"\n\n{proof}" if relevant_win else ""
@@ -802,6 +805,10 @@ def job_focus_terms(job_description: str) -> list[str]:
         "work",
         "project",
         "freelancer",
+        "full",
+        "stack",
+        "developer",
+        "manage",
         "small",
         "agency",
         "monthly",
@@ -812,11 +819,14 @@ def job_focus_terms(job_description: str) -> list[str]:
         "about",
     }
     ordered: list[str] = []
+    if "crm" in lowered:
+        ordered.append("crm")
     if "sequence" in lowered or ("email" in lowered and any(term in lowered for term in ("welcome", "campaign", "newsletter", "copy", "subscribers"))):
         for priority in ("email", "emails", "sequence"):
             if priority in terms and priority not in ordered:
                 ordered.append(priority)
     priority_terms = (
+        "crm",
         "quickbooks",
         "bookkeeping",
         "reconciliation",
@@ -854,6 +864,8 @@ def practical_question_for_job(job_description: str, focus_terms: list[str]) -> 
         return "Should the first sketch focus on the main character or one full scene?"
     if "react native" in lowered or "firebase" in lowered or "notification" in lowered:
         return "Which bug is blocking users most right now?"
+    if "crm" in lowered:
+        return "Which CRM task should be handled first?"
     if "dashboard" in lowered or "looker" in lowered or "report" in lowered:
         return "Which metric has to be trusted first in the report?"
     if focus_terms:
@@ -1320,7 +1332,11 @@ def first_sentence_has_job_specific_noun(first_sentence: str, job_description: s
         "action",
         "description",
     }
-    return bool(sentence_terms.intersection(job_terms))
+    short_job_terms = {term for term in ("api", "crm", "seo", "ui", "ux") if category_marker_present(term, job_description.lower())}
+    short_sentence_terms = {
+        term for term in short_job_terms if category_marker_present(term, first_sentence.lower())
+    }
+    return bool(sentence_terms.intersection(job_terms) or short_sentence_terms)
 
 
 def detect_domains(text: str) -> set[str]:
