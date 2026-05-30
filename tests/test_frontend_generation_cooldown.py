@@ -4,6 +4,10 @@ HTML = Path(__file__).resolve().parents[1] / "public" / "index.html"
 SOURCE = HTML.read_text(encoding="utf-8")
 
 
+def test_frontend_uses_single_provider_attempt_before_server_fallback():
+    assert "const MAX_GENERATION_ATTEMPTS = 1;" in SOURCE
+
+
 def test_frontend_defines_20_second_generation_cooldown():
     assert "const GENERATION_COOLDOWN_MS = 20000;" in SOURCE
     assert "let generationCooldownUntil = 0;" in SOURCE
