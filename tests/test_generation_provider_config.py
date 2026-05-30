@@ -9,6 +9,7 @@ def clear_generation_env(monkeypatch):
         "GENERATION_API_KEY",
         "GENERATION_API_URL",
         "GENERATION_MODEL_ID",
+        "GROQ_API_KEY",
         "GITHUB_MODELS_TOKEN",
         "GITHUB_PAT",
         "GITHUB_TOKEN",
@@ -25,6 +26,18 @@ def test_bluesminds_key_selects_bluesminds_provider(monkeypatch):
         "bluesminds",
         server.BLUESMINDS_MODELS_URL,
         server.BLUESMINDS_MODEL_ID,
+    )
+
+
+def test_groq_key_selects_groq_provider(monkeypatch):
+    clear_generation_env(monkeypatch)
+    monkeypatch.setenv("GROQ_API_KEY", "groq-test-key")
+
+    assert server.github_models_token() == "groq-test-key"
+    assert server.generation_provider_config() == (
+        "groq",
+        server.GROQ_MODELS_URL,
+        server.GROQ_MODEL_ID,
     )
 
 

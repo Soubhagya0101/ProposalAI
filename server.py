@@ -20,11 +20,14 @@ ROOT = Path(__file__).resolve().parent
 PUBLIC_DIR = ROOT / "public"
 GITHUB_MODELS_URL = "https://models.github.ai/inference/chat/completions"
 BLUESMINDS_MODELS_URL = "https://api.bluesminds.com/v1/chat/completions"
+GROQ_MODELS_URL = "https://api.groq.com/openai/v1/chat/completions"
 GITHUB_MODEL_ID = "openai/gpt-4o-mini"
 BLUESMINDS_MODEL_ID = "gpt-4o-mini"
+GROQ_MODEL_ID = "llama-3.3-70b-versatile"
 MODEL_ID = BLUESMINDS_MODEL_ID
 USER_RETRY_MESSAGE = "Taking longer than usual - please try again."
-PROVIDER_MAX_ATTEMPTS = 3
+PROVIDER_MAX_ATTEMPTS = 1
+PROVIDER_TIMEOUT_SECONDS = 25
 IST = timezone(timedelta(hours=5, minutes=30))
 FEEDBACK_TYPES = {
     "human": "This sounds human",
@@ -916,7 +919,7 @@ def request_github_models(token: str, prompt: str, temperature: float = 0.7, max
     data: Any = {}
     for attempt in range(1, PROVIDER_MAX_ATTEMPTS + 1):
         try:
-            with urllib.request.urlopen(request, timeout=70) as response:
+            with urllib.request.urlopen(request, timeout=PROVIDER_TIMEOUT_SECONDS) as response:
                 raw = response.read().decode("utf-8", errors="replace")
                 data = json.loads(raw) if raw.strip() else {}
                 break
@@ -1524,7 +1527,14 @@ def extract_text(data: Any) -> str:
 
 def github_models_token() -> str:
     load_dotenv()
-    for name in ("BLUESMINDS_API_KEY", "GENERATION_API_KEY", "GITHUB_MODELS_TOKEN", "GITHUB_PAT", "GITHUB_TOKEN"):
+    for name in (
+        "GENERATION_API_KEY",
+        "GROQ_API_KEY",
+        "BLUESMINDS_API_KEY",
+        "GITHUB_MODELS_TOKEN",
+        "GITHUB_PAT",
+        "GITHUB_TOKEN",
+    ):
         value = os.getenv(name, "").strip()
         if value:
             return value
@@ -1534,15 +1544,18 @@ def github_models_token() -> str:
 def generation_provider_config() -> tuple[str, str, str]:
     """Return provider name, OpenAI-compatible chat completions URL, and model id.
 
-    BlueMinds is preferred when its key is present. GitHub Models remains as a
-    fallback so local tests and older Render env vars keep working until the new
-    public-test key is added.
+    Explicit GENERATION_* env vars take priority for hosted-provider testing.
+    Groq is supported directly because its free tier has more useful public-test
+    limits than GitHub Models or OpenRouter free models. BlueMinds and GitHub
+    remain fallbacks so older Render env vars keep working.
     """
     load_dotenv()
     explicit_url = os.getenv("GENERATION_API_URL", "").strip()
     explicit_model = os.getenv("GENERATION_MODEL_ID", "").strip()
     if explicit_url:
         return "custom", explicit_url, explicit_model or MODEL_ID
+    if os.getenv("GROQ_API_KEY", "").strip():
+        return "groq", GROQ_MODELS_URL, explicit_model or GROQ_MODEL_ID
     if os.getenv("BLUESMINDS_API_KEY", "").strip() or os.getenv("GENERATION_API_KEY", "").strip():
         return "bluesminds", BLUESMINDS_MODELS_URL, explicit_model or BLUESMINDS_MODEL_ID
     return "github", GITHUB_MODELS_URL, explicit_model or GITHUB_MODEL_ID
