@@ -908,6 +908,7 @@ def request_github_models(token: str, prompt: str, temperature: float = 0.7, max
         "Accept": "application/json",
         "Authorization": f"Bearer {token}",
         "Content-Type": "application/json",
+        "User-Agent": "ProposalAI/1.0",
     }
     if provider_name == "github":
         headers["Accept"] = "application/vnd.github+json"

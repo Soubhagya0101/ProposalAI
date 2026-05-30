@@ -29,6 +29,32 @@ def test_bluesminds_key_selects_bluesminds_provider(monkeypatch):
     )
 
 
+def test_provider_request_sets_user_agent(monkeypatch):
+    captured_headers = {}
+
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def read(self):
+            return b'{"choices":[{"message":{"content":"ok"}}]}'
+
+    def fake_urlopen(request, timeout):
+        captured_headers.update(dict(request.header_items()))
+        return FakeResponse()
+
+    monkeypatch.setattr(server.urllib.request, "urlopen", fake_urlopen)
+    monkeypatch.setenv("GROQ_API_KEY", "groq-test-key")
+
+    result = server.request_github_models("groq-test-key", "Say ok", temperature=0, max_tokens=10)
+
+    assert result.status == 200
+    assert captured_headers["User-agent"] == "ProposalAI/1.0"
+
+
 def test_groq_key_selects_groq_provider(monkeypatch):
     clear_generation_env(monkeypatch)
     monkeypatch.setenv("GROQ_API_KEY", "groq-test-key")
