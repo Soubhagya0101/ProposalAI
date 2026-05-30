@@ -10,8 +10,16 @@ ProposalAI is now a website-only Docker service with Google Sheets feedback coll
 4. Add the generation environment variable:
 
 ```text
-GITHUB_MODELS_TOKEN
+GROQ_API_KEY
 ```
+
+Recommended model for public testing:
+
+```text
+GENERATION_MODEL_ID=llama-3.3-70b-versatile
+```
+
+`GITHUB_MODELS_TOKEN` can remain as a fallback, but Groq is preferred for public tests because the free limits are much more useful than GitHub/OpenRouter free limits.
 
 5. To retain feedback on Render, create a `Feedback` tab in a Google Sheet and share it with a Google service account. Add:
 
@@ -45,7 +53,7 @@ Expected:
 {"ok": true, "service": "proposalai"}
 ```
 
-GitHub Models connection test:
+Groq connection test:
 
 ```text
 https://YOUR-SERVICE.onrender.com/api/generate-proposal?test=1
@@ -54,8 +62,10 @@ https://YOUR-SERVICE.onrender.com/api/generate-proposal?test=1
 Expected:
 
 ```json
-{"ok": true, "model": "openai/gpt-4o-mini", "response": "ProposalAI GitHub Models connection works."}
+{"ok": true, "model": "llama-3.3-70b-versatile", "response": "ProposalAI GitHub Models connection works."}
 ```
+
+The response text may vary slightly by provider, but the status should be `200` and the `model` should match the configured Groq model.
 
 The app loads at the Render service root:
 

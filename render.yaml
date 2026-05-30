@@ -10,6 +10,10 @@ services:
     healthCheckPath: /health
     autoDeployTrigger: commit
     envVars:
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GENERATION_MODEL_ID
+        value: llama-3.3-70b-versatile
       - key: GITHUB_MODELS_TOKEN
         sync: false
       - key: PROPOSALAI_FEEDBACK_SHEET_ID
