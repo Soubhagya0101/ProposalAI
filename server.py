@@ -432,6 +432,7 @@ def generate_proposal(body: dict[str, Any], test_mode: bool = False) -> ApiResul
     proposal = clean_proposal(str(result.payload["proposal"]))
     findings = proposal_violations(proposal, profile, job_description, relevant_win, style)
     blockers = blocking_violations(proposal, findings)
+    provider_repair_failed = False
     if blockers:
         result = request_github_models(
             token,
@@ -481,12 +482,14 @@ def generate_proposal(body: dict[str, Any], test_mode: bool = False) -> ApiResul
             max_tokens=620 if style == "detailed" else 320,
         )
         if result.status != 200:
-            return result
-        proposal = clean_proposal(str(result.payload["proposal"]))
-        findings = proposal_violations(proposal, profile, job_description, relevant_win, style)
-        blockers = blocking_violations(proposal, findings)
+            print(f"[ProposalAI] Provider repair failed with {result.status}; using rule-based draft.", flush=True)
+            provider_repair_failed = True
+        else:
+            proposal = clean_proposal(str(result.payload["proposal"]))
+            findings = proposal_violations(proposal, profile, job_description, relevant_win, style)
+            blockers = blocking_violations(proposal, findings)
 
-    if blockers:
+    if blockers and not provider_repair_failed:
         result = request_github_models(
             token,
             build_fallback_prompt(profile, job_description, relevant_win, guidance, style),
@@ -494,10 +497,11 @@ def generate_proposal(body: dict[str, Any], test_mode: bool = False) -> ApiResul
             max_tokens=620 if style == "detailed" else 220,
         )
         if result.status != 200:
-            return result
-        proposal = clean_proposal(str(result.payload["proposal"]))
-        findings = proposal_violations(proposal, profile, job_description, relevant_win, style)
-        blockers = blocking_violations(proposal, findings)
+            print(f"[ProposalAI] Provider fallback prompt failed with {result.status}; using rule-based draft.", flush=True)
+        else:
+            proposal = clean_proposal(str(result.payload["proposal"]))
+            findings = proposal_violations(proposal, profile, job_description, relevant_win, style)
+            blockers = blocking_violations(proposal, findings)
     if blockers:
         fallback = build_rule_based_proposal(job_description, relevant_win, style)
         fallback_findings = proposal_violations(fallback, profile, job_description, relevant_win, style)

@@ -63,6 +63,39 @@ def test_provider_failure_can_return_valid_rule_based_draft(monkeypatch):
     assert result.payload.get("fallback") == "rule_based_provider_failure"
 
 
+def test_blocked_provider_draft_uses_rule_based_when_repair_hits_limit(monkeypatch):
+    profile = {
+        "fullName": "Maya",
+        "niche": "Customer support specialist",
+        "experience": "5 years",
+        "tone": "Direct",
+        "skills": ["refund replies", "shipping questions", "conversation tagging"],
+        "pastWin": "Reduced unresolved weekend tickets for a small ecommerce store.",
+        "rate": "$35/hr",
+    }
+    job = (
+        "Ecommerce brand needs weekend customer support help. Reply to refund, shipping, "
+        "and product questions using our tone guide and tag conversations correctly."
+    )
+    calls = {"count": 0}
+
+    def fake_provider(*args, **kwargs):
+        calls["count"] += 1
+        if calls["count"] == 1:
+            return server.ApiResult(200, {"proposal": "Hello, I am passionate and detail-oriented."})
+        return server.error(server.USER_RETRY_MESSAGE, 503)
+
+    monkeypatch.setattr(server, "github_models_token", lambda: "test-token")
+    monkeypatch.setattr(server, "request_github_models", fake_provider)
+
+    result = server.generate_proposal({"profile": profile, "jobDescription": job, "style": "quick"})
+
+    assert result.status == 200
+    assert result.payload.get("fallback") is None
+    assert "customer" in result.payload["proposal"].lower() or "support" in result.payload["proposal"].lower()
+    assert calls["count"] == 2
+
+
 def test_broad_public_test_does_not_block_adjacent_freelance_categories(monkeypatch):
     profile = {
         "fullName": "SK Test",
