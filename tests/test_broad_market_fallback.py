@@ -31,6 +31,23 @@ EMAIL_JOB = (
     "The emails should explain the course, build trust, and invite people to book a trial class."
 )
 
+WEBSITE_COPY_PROFILE = {
+    "fullName": "Ravi",
+    "niche": "Website copywriter",
+    "experience": "4 years",
+    "tone": "Direct",
+    "skills": ["website rewrites", "SEO-friendly copy", "manual editing"],
+    "pastWin": "",
+    "rate": "$25/hr",
+}
+
+WEBSITE_COPY_JOB = (
+    "Need a detail-oriented website copywriter to rewrite existing website content for a new site. "
+    "The copy should be SEO-friendly, professional, and match the original business message. "
+    "Future projects available if this goes well. Estimated 1-3 hours, budget $10. "
+    "You can use AI tools like ChatGPT, Claude, or Gemini but final text must read naturally."
+)
+
 
 def test_bookkeeping_fallback_uses_current_job_not_dashboard_template():
     relevant_win = server.select_relevant_win(BOOKKEEPER_PROFILE["pastWin"], BOOKKEEPER_JOB)
@@ -46,19 +63,8 @@ def test_bookkeeping_fallback_uses_current_job_not_dashboard_template():
 
 
 def test_validator_allows_banned_wording_when_it_came_from_job_description():
-    profile = {
-        "fullName": "Ravi",
-        "niche": "Website copywriter",
-        "experience": "4 years",
-        "tone": "Direct",
-        "skills": ["website rewrites", "SEO-friendly copy", "manual editing"],
-        "pastWin": "",
-        "rate": "$25/hr",
-    }
-    job = (
-        "Need a detail-oriented website copywriter to rewrite existing website content. "
-        "The copy should be SEO-friendly, natural, and ready within 1-3 hours."
-    )
+    profile = WEBSITE_COPY_PROFILE
+    job = WEBSITE_COPY_JOB
     proposal = (
         "Website rewrites can lose the original business message when the new copy only sounds polished. "
         "I can rewrite the existing pages into clean, SEO-friendly copy while keeping the meaning intact and manually editing the final text for better website readability. "
@@ -68,6 +74,20 @@ def test_validator_allows_banned_wording_when_it_came_from_job_description():
     findings = server.proposal_violations(proposal, profile, job, "", "quick")
 
     assert not any(finding.startswith("banned wording used:") for finding in findings)
+    assert not server.blocking_violations(proposal, findings)
+
+
+def test_website_copywriting_fallback_sounds_human_for_long_real_job():
+    proposal = server.build_rule_based_proposal(WEBSITE_COPY_JOB, "", "quick")
+    lowered = proposal.lower()
+
+    assert "copywriter, rewrite, existing" not in lowered
+    assert "treated as separate pieces" not in lowered
+    assert "website rewrites can go wrong" in lowered
+    assert "seo-friendly" in lowered
+    assert "manually editing" in lowered
+
+    findings = server.proposal_violations(proposal, WEBSITE_COPY_PROFILE, WEBSITE_COPY_JOB, "", "quick")
     assert not server.blocking_violations(proposal, findings)
 
 

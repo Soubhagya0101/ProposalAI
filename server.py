@@ -755,10 +755,10 @@ def build_rule_based_proposal(job_description: str, relevant_win: str, style: st
         if style == "detailed":
             proof = f"\n\n{relevant_win}." if relevant_win else ""
             return (
-                "Invoice tools become painful when they are either too bloated or too limited for the way a small business actually bills. "
+                "Invoice tools become painful when they are either too bloated or too limited for how a small business bills. "
                 "The real risk is building fields and totals that do not match the invoices already being sent."
                 f"{proof}\n\n"
-                "You'll have a lightweight tool shaped around the invoice details, totals, and delivery format the business actually uses. "
+                "You'll have a lightweight tool shaped around the invoice details and totals the business actually uses. "
                 "The result should feel like their billing workflow, not another generic finance app.\n\n"
                 f"{question}"
             )
@@ -772,22 +772,43 @@ def build_rule_based_proposal(job_description: str, relevant_win: str, style: st
             f"{proof_or_outcome} {question}"
         )
 
+    if any(term in lowered for term in ("copywriter", "copywriting", "website copy", "rewrite", "rewriting", "seo-friendly", "seo friendly")):
+        question = "Could you share the existing website link and page list?"
+        if style == "detailed":
+            proof = f"\n\n{relevant_win}." if relevant_win else ""
+            return (
+                "Website rewrites can go wrong when the new copy sounds polished but drifts away from the original business message. "
+                "The hard part is keeping the meaning intact while making each section clearer and easier to read."
+                f"{proof}\n\n"
+                "You'll have clean, SEO-friendly website copy that keeps the original intent and reads naturally after manual editing. "
+                "The first version can stay tight enough for a quick review without turning the rewrite into a bigger branding project.\n\n"
+                f"{question}"
+            )
+        proof_or_outcome = (
+            f"{relevant_win}, so I can keep the rewrite tied to a real content outcome instead of polishing words for their own sake."
+            if relevant_win
+            else "I can turn the existing pages into clean, SEO-friendly copy while keeping the meaning intact and manually editing the final text so it reads naturally."
+        )
+        return (
+            "Website rewrites can go wrong when the new copy sounds polished but drifts away from the original business message. "
+            f"{proof_or_outcome} {question}"
+        )
+
     focus_terms = job_focus_terms(job_description)
-    primary = focus_terms[0] if focus_terms else "this work"
-    secondary = ", ".join(focus_terms[1:4]) if len(focus_terms) > 1 else "the details in the brief"
+    primary = focus_terms[0] if focus_terms else "the work"
     question = practical_question_for_job(job_description, focus_terms)
-    opener = f"The risk in {primary} work is that {secondary} get treated as separate pieces instead of one client outcome."
+    opener = f"The hard part with {primary} work is turning a busy brief into one clear finished result."
     outcome = (
-        f"You'll have a focused proposal draft tied to {', '.join(focus_terms[:4]) if focus_terms else 'the exact brief'}, "
-        "without adding tools, platforms, or features the client did not ask for."
+        "You'll have a draft that focuses on the client's actual outcome, keeps the scope tight, "
+        "and avoids adding details that were never mentioned in the brief or making the client sort through extra assumptions."
     )
-    proof = f"{relevant_win}, so I would keep the proposal grounded in the specific outcome named in the brief."
+    proof = f"{relevant_win}, so I would keep the message grounded in the result the client actually needs without padding it with unrelated claims."
     if style == "detailed":
         proof_block = f"\n\n{proof}" if relevant_win else ""
         return (
-            f"{opener} The proposal should make the client feel the brief was read closely, not that a reusable pitch was pasted over it."
+            f"{opener} A proposal should show the brief was understood without stuffing in every keyword the client wrote."
             f"{proof_block}\n\n"
-            f"{outcome} That keeps the message useful across different freelance skills while still sounding specific to this job.\n\n"
+            f"{outcome} That makes the message specific enough to feel human without inventing platforms, tools, or proof.\n\n"
             f"{question}"
         )
     proof_or_outcome = proof if relevant_win else outcome
@@ -837,6 +858,8 @@ def job_focus_terms(job_description: str) -> list[str]:
                 ordered.append(priority)
     priority_terms = (
         "crm",
+        "customer support",
+        "support",
         "quickbooks",
         "bookkeeping",
         "reconciliation",
@@ -868,6 +891,8 @@ def practical_question_for_job(job_description: str, focus_terms: list[str]) -> 
         return "What action should the final email ask readers to take?"
     if "video" in lowered or "youtube" in lowered:
         return "Should the edit prioritize retention, Shorts, or captions first?"
+    if "customer support" in lowered or "support" in lowered:
+        return "Which support replies need the strictest tone match first?"
     if "quickbooks" in lowered or "bookkeeping" in lowered or "reconciliation" in lowered:
         return "Which month should the first reconciliation and report cover?"
     if "illustration" in lowered or "illustrator" in lowered or "book" in lowered:
