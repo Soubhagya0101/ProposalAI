@@ -26,8 +26,8 @@ BLUESMINDS_MODEL_ID = "gpt-4o-mini"
 GROQ_MODEL_ID = "llama-3.3-70b-versatile"
 MODEL_ID = BLUESMINDS_MODEL_ID
 USER_RETRY_MESSAGE = "Taking longer than usual - please try again."
-PROVIDER_MAX_ATTEMPTS = 1
-PROVIDER_TIMEOUT_SECONDS = 25
+PROVIDER_MAX_ATTEMPTS = 3
+PROVIDER_TIMEOUT_SECONDS = 45
 IST = timezone(timedelta(hours=5, minutes=30))
 FEEDBACK_TYPES = {
     "human": "This sounds human",
@@ -1128,10 +1128,11 @@ def proposal_violations(
             violations.append(f"detailed draft has {count} words; required range is 90 to 130")
     elif not 50 <= count <= 80:
         violations.append(f"quick draft has {count} words; required range is 50 to 80")
-    used = [phrase for phrase in FORBIDDEN_PHRASES if phrase in lowered]
+    job_description_lower = job_description.lower()
+    used = [phrase for phrase in FORBIDDEN_PHRASES if phrase in lowered and phrase not in job_description_lower]
     if used:
         violations.append(f"banned wording used: {', '.join(used)}")
-    filler = [phrase for phrase in GENERIC_FILLER if phrase in lowered]
+    filler = [phrase for phrase in GENERIC_FILLER if phrase in lowered and phrase not in job_description_lower]
     if filler:
         violations.append(f"generic filler used: {', '.join(filler)}")
     if re.search(r"\byears?\s+of\b.*\bexperience\b", lowered):

@@ -45,6 +45,32 @@ def test_bookkeeping_fallback_uses_current_job_not_dashboard_template():
     assert not server.blocking_violations(proposal, findings)
 
 
+def test_validator_allows_banned_wording_when_it_came_from_job_description():
+    profile = {
+        "fullName": "Ravi",
+        "niche": "Website copywriter",
+        "experience": "4 years",
+        "tone": "Direct",
+        "skills": ["website rewrites", "SEO-friendly copy", "manual editing"],
+        "pastWin": "",
+        "rate": "$25/hr",
+    }
+    job = (
+        "Need a detail-oriented website copywriter to rewrite existing website content. "
+        "The copy should be SEO-friendly, natural, and ready within 1-3 hours."
+    )
+    proposal = (
+        "Website rewrites can lose the original business message when the new copy only sounds polished. "
+        "I can rewrite the existing pages into clean, SEO-friendly copy while keeping the meaning intact and manually editing the final text for better website readability. "
+        "Could you share the existing website link and page list?"
+    )
+
+    findings = server.proposal_violations(proposal, profile, job, "", "quick")
+
+    assert not any(finding.startswith("banned wording used:") for finding in findings)
+    assert not server.blocking_violations(proposal, findings)
+
+
 def test_provider_failure_can_return_valid_rule_based_draft(monkeypatch):
     monkeypatch.setattr(server, "github_models_token", lambda: "test-token")
     monkeypatch.setattr(
