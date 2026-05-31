@@ -802,7 +802,11 @@ def build_rule_based_proposal(job_description: str, relevant_win: str, style: st
         "You'll have a draft that focuses on the client's actual outcome, keeps the scope tight, "
         "and avoids adding details that were never mentioned in the brief or making the client sort through extra assumptions."
     )
-    proof = f"{relevant_win}, so I would keep the message grounded in the result the client actually needs without padding it with unrelated claims."
+    proof = (
+        f"{relevant_win.strip().rstrip('.!?')}. I would keep the message grounded in the result the client actually needs without padding it with unrelated claims."
+        if relevant_win
+        else ""
+    )
     if style == "detailed":
         proof_block = f"\n\n{proof}" if relevant_win else ""
         return (

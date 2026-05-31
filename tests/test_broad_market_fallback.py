@@ -139,6 +139,7 @@ def test_blocked_provider_draft_uses_rule_based_when_repair_hits_limit(monkeypat
     assert result.status == 200
     assert result.payload.get("fallback") is None
     assert "customer" in result.payload["proposal"].lower() or "support" in result.payload["proposal"].lower()
+    assert ".," not in result.payload["proposal"]
     assert calls["count"] == 2
 
 
