@@ -136,6 +136,15 @@ CONFIRMATION_ENDINGS = (
     "share your requirements",
     "get started",
 )
+REAL_FREELANCER_RULES = (
+    "Real freelancer behavior from Upwork/forum feedback:",
+    "- Write like the client is skimming a pile of proposals and filtering for the person who actually read the brief.",
+    "- Do not try to prove the freelancer is impressive. Answer the client's exact problem first.",
+    "- Mirror one specific constraint from the job, then add a useful observation about what can go wrong.",
+    "- Use one relevant proof point only when supplied. Do not list every skill, tool, or past project.",
+    "- End with a practical next step or decision question, never a forced sales question.",
+    "- Sound like a working freelancer giving a clear read on the job, not a SaaS landing page or resume summary.",
+)
 INSIGHT_MARKERS = (
     "worst",
     "tight",
@@ -460,6 +469,7 @@ def generate_proposal(body: dict[str, Any], test_mode: bool = False) -> ApiResul
                     "- Ask at most one question and only when the answer changes the work.",
                     "- Do not ask broad discovery questions such as what topics, features, or issues the client wants.",
                     "- A question is permitted only if it identifies a technical decision such as platform or migration.",
+                    *REAL_FREELANCER_RULES,
                     f"- Never use any of these phrases: {', '.join(FORBIDDEN_PHRASES)}.",
                     f"- Avoid generic filler such as: {', '.join(GENERIC_FILLER)}.",
                     "- End with one specific practical question.",
@@ -794,25 +804,54 @@ def build_rule_based_proposal(job_description: str, relevant_win: str, style: st
             f"{proof_or_outcome} {question}"
         )
 
+    if any(term in lowered for term in ("virtual assistant", "admin", "data entry", "spreadsheet", "contact records", "meeting notes")):
+        question = (
+            "Which file should be cleaned up first: the spreadsheet, notes, or contact records?"
+            if all(term in lowered for term in ("spreadsheet", "notes", "contact"))
+            else "Which admin task needs to be finished first?"
+        )
+        if style == "detailed":
+            proof = f"\n\n{relevant_win}." if relevant_win else ""
+            return (
+                "Messy admin work usually looks small until missing details show up later in a spreadsheet, notes file, or contact record. "
+                "The risk is not the volume of tasks; it is guessing at unclear details and creating cleanup work for someone else."
+                f"{proof}\n\n"
+                "You'll get the requested records cleaned up around the exact items in the brief, with unclear fields flagged instead of hidden. "
+                "That keeps the work useful for the next person who has to rely on it.\n\n"
+                f"{question}"
+            )
+        proof_or_outcome = (
+            f"{relevant_win}, so I'll keep the admin work tied to the exact records that need cleanup."
+            if relevant_win
+            else "You'll get the requested records cleaned up around the exact items in the brief, with unclear fields flagged instead of guessed."
+        )
+        return (
+            "Messy admin work usually looks small until missing details show up later in the spreadsheet, notes, or contact records. "
+            f"{proof_or_outcome} {question}"
+        )
+
     focus_terms = job_focus_terms(job_description)
     primary = focus_terms[0] if focus_terms else "the work"
     question = practical_question_for_job(job_description, focus_terms)
-    opener = f"The hard part with {primary} work is turning a busy brief into one clear finished result."
+    opener = (
+        f"The hard part with {primary} work is not proving you can do everything; "
+        "it is answering the exact part of the brief the client will judge first."
+    )
     outcome = (
-        "You'll have a draft that focuses on the client's actual outcome, keeps the scope tight, "
-        "and avoids adding details that were never mentioned in the brief or making the client sort through extra assumptions."
+        "You'll get a focused first version that stays tied to the real request, avoids unrelated claims, "
+        "and gives you something practical to review instead of a long generic delivery."
     )
     proof = (
-        f"{relevant_win.strip().rstrip('.!?')}. I would keep the message grounded in the result the client actually needs without padding it with unrelated claims."
+        f"{relevant_win.strip().rstrip('.!?')}. I'll keep this focused on the job in front of us instead of padding it with unrelated skills."
         if relevant_win
         else ""
     )
     if style == "detailed":
         proof_block = f"\n\n{proof}" if relevant_win else ""
         return (
-            f"{opener} A proposal should show the brief was understood without stuffing in every keyword the client wrote."
+            f"{opener} Clients usually filter these jobs by whether the first reply understands the constraint, not by the longest skill list."
             f"{proof_block}\n\n"
-            f"{outcome} That makes the message specific enough to feel human without inventing platforms, tools, or proof.\n\n"
+            f"{outcome} The goal is to make the first useful version clear enough that the next decision is obvious.\n\n"
             f"{question}"
         )
     proof_or_outcome = proof if relevant_win else outcome
@@ -1041,6 +1080,7 @@ def build_prompt(profile: dict[str, Any], job_description: str, relevant_win: st
             "- Do not mention years of experience. A short proposal has no room for background padding.",
             "- Use I only for the supplied proof point or a direct outcome statement.",
             "- Ask no question unless its answer genuinely changes the work. Maximum one question. Avoid broad questions about topics, features, or issues.",
+            *REAL_FREELANCER_RULES,
             f"- Do not use these words or phrases: {', '.join(FORBIDDEN_PHRASES)}.",
             f"- Avoid hollow filler such as: {', '.join(GENERIC_FILLER)}.",
             "- Use short paragraphs and short sentences. Natural colleague-to-colleague language.",
@@ -1112,6 +1152,7 @@ def build_fallback_prompt(
             style_rules(style),
             *format_instructions,
             "No greeting. No general benefits. No invented deliverables. No years of experience.",
+            *REAL_FREELANCER_RULES,
             "Only mention tools, platforms, or features that appear explicitly in the job description or the freelancer profile. Never invent context.",
             "If a tool, platform, or feature is not explicitly present, speak generally instead of naming it.",
             f"Never use: {', '.join(FORBIDDEN_PHRASES + GENERIC_FILLER)}.",

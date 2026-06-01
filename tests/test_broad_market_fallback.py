@@ -182,3 +182,68 @@ def test_broad_public_test_does_not_block_adjacent_freelance_categories(monkeypa
         result = server.generate_proposal({"profile": profile, "jobDescription": job, "style": "quick"})
         assert result.status == 200
         assert result.payload.get("fallback") == "rule_based_provider_failure"
+
+
+def test_prompt_uses_real_freelancer_buyer_psychology_rules():
+    prompt = server.build_prompt(EMAIL_PROFILE, EMAIL_JOB, EMAIL_PROFILE["pastWin"], "", "quick")
+
+    lowered = prompt.lower()
+    assert "client is skimming a pile of proposals" in lowered
+    assert "do not try to prove the freelancer is impressive" in lowered
+    assert "one relevant proof point" in lowered
+    assert "practical next step or decision question" in lowered
+
+
+def test_generic_fallback_reflects_real_freelancer_commentary_without_skill_dump():
+    profile = {
+        "fullName": "Nora",
+        "niche": "Translator",
+        "experience": "3 years",
+        "tone": "Direct",
+        "skills": ["translation", "localization", "proofreading"],
+        "pastWin": "",
+        "rate": "$18/hr",
+    }
+    job = (
+        "Need a translator to localize onboarding emails from English to Spanish, keep the tone casual, "
+        "and flag phrases that would sound awkward to native readers."
+    )
+
+    proposal = server.build_rule_based_proposal(job, "", "quick")
+    lowered = proposal.lower()
+
+    assert "not proving you can do everything" in lowered
+    assert "exact part of the brief" in lowered
+    assert "long generic" in lowered
+    assert "similar projects" not in lowered
+    assert "years of experience" not in lowered
+
+    findings = server.proposal_violations(proposal, profile, job, "", "quick")
+    assert not server.blocking_violations(proposal, findings)
+
+
+def test_virtual_assistant_fallback_uses_admin_reality_not_awkward_focus_term():
+    profile = {
+        "fullName": "Mina",
+        "niche": "Virtual assistant",
+        "experience": "3 years",
+        "tone": "Direct",
+        "skills": ["admin support", "data entry", "calendar cleanup"],
+        "pastWin": "",
+        "rate": "$18/hr",
+    }
+    job = (
+        "Need a virtual assistant to clean up a messy spreadsheet, organize meeting notes, "
+        "update contact records, and flag missing details before Friday."
+    )
+
+    proposal = server.build_rule_based_proposal(job, "", "quick")
+    lowered = proposal.lower()
+
+    assert "messy admin work" in lowered
+    assert "unclear fields flagged" in lowered
+    assert "which part of virtual" not in lowered
+    assert "the spreadsheet, notes, or contact records" in lowered
+
+    findings = server.proposal_violations(proposal, profile, job, "", "quick")
+    assert not server.blocking_violations(proposal, findings)
