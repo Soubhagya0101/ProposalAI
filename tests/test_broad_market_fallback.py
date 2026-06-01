@@ -91,6 +91,19 @@ def test_website_copywriting_fallback_sounds_human_for_long_real_job():
     assert not server.blocking_violations(proposal, findings)
 
 
+def test_clean_proposal_repairs_provider_punctuation_after_past_win():
+    proposal = server.clean_proposal(
+        "Website rewrites can go wrong when the copy drifts from the original message. "
+        "Rewrote a service page that lifted consultation bookings by 18%., so I can keep the rewrite tied to a real content outcome. "
+        "could you share the existing website link and page list?"
+    )
+
+    assert "%. ," not in proposal
+    assert "%.," not in proposal
+    assert "18%. So I can" in proposal
+    assert "Could you share" in proposal
+
+
 def test_provider_failure_can_return_valid_rule_based_draft(monkeypatch):
     monkeypatch.setattr(server, "github_models_token", lambda: "test-token")
     monkeypatch.setattr(

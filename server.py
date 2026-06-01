@@ -1138,6 +1138,12 @@ def clean_proposal(text: str) -> str:
     cleaned = re.sub(r"\bI will\b", "I'll", cleaned)
     cleaned = re.sub(r"\bI would\b", "I'd", cleaned)
     cleaned = re.sub(r"\s+([,.!?;:])", r"\1", cleaned)
+    cleaned = re.sub(r"([.!?])\s*,\s+", r"\1 ", cleaned)
+    cleaned = re.sub(
+        r"(^|[.!?]\s+)([a-z])",
+        lambda match: match.group(1) + match.group(2).upper(),
+        cleaned,
+    )
     cleaned = re.sub(r"[ \t]{2,}", " ", cleaned).strip()
     return cleaned
 
