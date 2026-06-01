@@ -591,7 +591,7 @@
           </div>
         </div>
 
-        <form class="panel form-grid" id="profileForm">
+        <form class="panel form-grid" id="profileForm" novalidate>
           <div class="panel-header">
             <div>
               <h2>Set up your profile</h2>
@@ -868,7 +868,7 @@
     function updateGenerateButtonState() {
       const count = jobDescription.value.trim().length;
       const isCoolingDown = isGenerationCoolingDown();
-      generateBtn.disabled = isGenerating || isCoolingDown || count < MIN_JOB_CHARS;
+      generateBtn.disabled = isGenerating || isCoolingDown;
       if (isGenerating) {
         generateLabel.innerHTML = '<span class="spinner" aria-hidden="true"></span> Generating...';
       } else if (isCoolingDown) {
@@ -942,7 +942,7 @@
               await sleep(700 * attempt);
               continue;
             }
-            const error = new Error(RETRY_MESSAGE);
+            const error = new Error(data.error || RETRY_MESSAGE);
             error.nonRetryable = !RETRYABLE_STATUS_CODES.has(response.status);
             throw error;
           }
@@ -1067,7 +1067,7 @@
         proposalOutput.textContent = "The proposal could not be generated.";
         outputMeta.textContent = "No proposal generated.";
         const message = String(error.message || "");
-        setStatus(generateStatus, message.startsWith("Profile mismatch:") ? message : RETRY_MESSAGE, "error");
+        setStatus(generateStatus, message || RETRY_MESSAGE, "error");
       } finally {
         setGenerating(false);
         startGenerationCooldown();

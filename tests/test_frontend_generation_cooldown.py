@@ -19,7 +19,23 @@ def test_generate_button_state_respects_generating_and_cooldown():
     assert "function updateGenerateButtonState()" in SOURCE
     assert "function setGenerating(generating)" in SOURCE
     assert "isGenerating = generating;" in SOURCE
-    assert "generateBtn.disabled = isGenerating || isCoolingDown || count < MIN_JOB_CHARS;" in SOURCE
+    assert "generateBtn.disabled = isGenerating || isCoolingDown;" in SOURCE
+
+
+def test_profile_form_uses_app_validation_not_native_required_popups():
+    assert 'id="profileForm" novalidate' in SOURCE
+    assert 'setStatus(profileStatus, `Complete: ${missing.join(", ")}.`, "error");' in SOURCE
+
+
+def test_generate_button_can_show_short_job_error_instead_of_dead_click():
+    assert "if (job.length < MIN_JOB_CHARS)" in SOURCE
+    assert 'setStatus(generateStatus, "Add at least 50 characters.", "error");' in SOURCE
+    assert "generateBtn.disabled = isGenerating || isCoolingDown;" in SOURCE
+
+
+def test_frontend_shows_server_errors_instead_of_generic_retry_only():
+    assert "const error = new Error(data.error || RETRY_MESSAGE);" in SOURCE
+    assert "setStatus(generateStatus, message || RETRY_MESSAGE, \"error\");" in SOURCE
 
 
 def test_successful_generation_starts_cooldown_and_shows_wait_message():
