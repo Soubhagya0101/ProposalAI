@@ -696,8 +696,8 @@ def build_rule_based_proposal(job_description: str, relevant_win: str, style: st
             "missing fields, or records that someone has to clean again later."
         )
         outcome = (
-            "You'll get a clean data list from the online sources in the brief, with software used where it safely speeds up collection "
-            "and manual checks used where accuracy matters more than volume."
+            "I can collect the data from online sources into a clean spreadsheet, use software where it speeds up the work, "
+            "and manually check entries where accuracy matters more than volume."
         )
         proof = f"{relevant_win.strip().rstrip('.!?')}." if relevant_win else ""
         if style == "detailed":

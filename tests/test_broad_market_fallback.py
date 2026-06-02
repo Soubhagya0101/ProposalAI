@@ -270,9 +270,11 @@ def test_data_research_fallback_understands_online_data_gathering_not_freelancer
 
     assert "online data gathering" in lowered
     assert "online sources" in lowered
-    assert "clean data list" in lowered
+    assert "clean spreadsheet" in lowered
+    assert "i can collect the data" in lowered
     assert "software" in lowered
-    assert "manual checks" in lowered
+    assert "manually check entries" in lowered
+    assert "you'll get" not in lowered
     assert "which part of freelancers" not in lowered
     assert "freelancers work" not in lowered
     assert proposal.endswith("?")
