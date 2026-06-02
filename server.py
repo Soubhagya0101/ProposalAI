@@ -512,6 +512,7 @@ def generate_proposal(body: dict[str, Any], test_mode: bool = False) -> ApiResul
             proposal = clean_proposal(str(result.payload["proposal"]))
             findings = proposal_violations(proposal, profile, job_description, relevant_win, style)
             blockers = blocking_violations(proposal, findings)
+    used_rule_based_validator_fallback = False
     if blockers:
         fallback = build_rule_based_proposal(job_description, relevant_win, style)
         fallback_findings = proposal_violations(fallback, profile, job_description, relevant_win, style)
@@ -521,12 +522,16 @@ def generate_proposal(body: dict[str, Any], test_mode: bool = False) -> ApiResul
             return error(USER_RETRY_MESSAGE, 502)
         proposal = fallback
         findings = fallback_findings
+        used_rule_based_validator_fallback = True
 
     warnings = [finding for finding in findings if finding not in blockers]
     if warnings:
         print(f"[ProposalAI] Draft accepted with warnings: {'; '.join(warnings)}.", flush=True)
 
-    return ApiResult(200, {"model": generation_model_id(), "style": style, "proposal": proposal.strip(), "wordCount": word_count(proposal)})
+    payload = {"model": generation_model_id(), "style": style, "proposal": proposal.strip(), "wordCount": word_count(proposal)}
+    if used_rule_based_validator_fallback:
+        payload["fallback"] = "rule_based_validator_block"
+    return ApiResult(200, payload)
 
 
 def save_feedback(body: dict[str, Any]) -> ApiResult:
@@ -684,6 +689,32 @@ def append_feedback_to_google_sheet(record: dict[str, Any]) -> None:
 
 def build_rule_based_proposal(job_description: str, relevant_win: str, style: str) -> str:
     lowered = job_description.lower()
+    if is_data_research_job(lowered):
+        question = data_research_question(lowered)
+        opener = (
+            "The risk with online data gathering is that a fast list can still be useless if unchecked sources leave duplicates, "
+            "missing fields, or records that someone has to clean again later."
+        )
+        outcome = (
+            "You'll get a clean data list from the online sources in the brief, with software used where it safely speeds up collection "
+            "and manual checks used where accuracy matters more than volume."
+        )
+        proof = f"{relevant_win.strip().rstrip('.!?')}." if relevant_win else ""
+        if style == "detailed":
+            proof_block = f"\n\n{proof}" if proof else ""
+            return (
+                f"{opener} The useful result is not just more rows; it is data that can be trusted when you review, filter, or hand it to the next person."
+                f"{proof_block}\n\n"
+                f"{outcome} I would keep unclear or unverifiable items flagged instead of guessed so the final sheet stays practical.\n\n"
+                f"{question}"
+            )
+        proof_or_outcome = (
+            f"{proof} I'll keep the collection tied to the exact sources, fields, and cleanup standard in the brief."
+            if proof
+            else outcome
+        )
+        return f"{opener} {proof_or_outcome} {question}"
+
     if "landing" in lowered and ("shopify" in lowered or "hero" in lowered or "mobile" in lowered):
         product = "eco-friendly water bottles" if "water bottle" in lowered else "the product"
         question = "Should the main call to action send shoppers to the product page, cart, or checkout?"
@@ -879,6 +910,12 @@ def job_focus_terms(job_description: str) -> list[str]:
         "work",
         "project",
         "freelancer",
+        "freelancers",
+        "candidate",
+        "candidates",
+        "person",
+        "worker",
+        "workers",
         "full",
         "stack",
         "developer",
@@ -891,8 +928,17 @@ def job_focus_terms(job_description: str) -> list[str]:
         "better",
         "sell",
         "about",
+        "handle",
+        "handled",
+        "fine",
+        "faster",
+        "cleaner",
     }
     ordered: list[str] = []
+    if is_data_research_job(lowered):
+        for priority in ("data collection", "web research", "online data gathering", "data"):
+            if priority not in ordered:
+                ordered.append(priority)
     if "crm" in lowered:
         ordered.append("crm")
     if "sequence" in lowered or ("email" in lowered and any(term in lowered for term in ("welcome", "campaign", "newsletter", "copy", "subscribers"))):
@@ -930,6 +976,8 @@ def job_focus_terms(job_description: str) -> list[str]:
 
 def practical_question_for_job(job_description: str, focus_terms: list[str]) -> str:
     lowered = job_description.lower()
+    if is_data_research_job(lowered):
+        return data_research_question(lowered)
     if "sequence" in lowered or ("email" in lowered and any(term in lowered for term in ("welcome", "campaign", "newsletter", "copy", "subscribers"))):
         return "What action should the final email ask readers to take?"
     if "video" in lowered or "youtube" in lowered:
@@ -949,6 +997,33 @@ def practical_question_for_job(job_description: str, focus_terms: list[str]) -> 
     if focus_terms:
         return f"Which part of {focus_terms[0]} should be handled first?"
     return "What constraint matters most for the first draft?"
+
+
+def is_data_research_job(lowered_job_description: str) -> bool:
+    data_patterns = (
+        "gather data",
+        "gathering data",
+        "collect data",
+        "collecting data",
+        "data collection",
+        "data gathering",
+        "online data",
+        "online sources",
+        "web research",
+        "internet research",
+        "lead list",
+        "lead lists",
+        "spreadsheet research",
+    )
+    return any(pattern in lowered_job_description for pattern in data_patterns)
+
+
+def data_research_question(lowered_job_description: str) -> str:
+    if any(term in lowered_job_description for term in ("field", "fields", "column", "columns")):
+        return "Which fields matter most in the final data list?"
+    if any(term in lowered_job_description for term in ("source", "sources", "website", "websites", "online")):
+        return "Do you already have target sources, or should the sources be found too?"
+    return "What fields do you want included in the final data list?"
 
 
 def request_github_models(token: str, prompt: str, temperature: float = 0.7, max_tokens: int = 1300) -> ApiResult:

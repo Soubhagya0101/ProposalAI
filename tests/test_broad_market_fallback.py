@@ -48,6 +48,21 @@ WEBSITE_COPY_JOB = (
     "You can use AI tools like ChatGPT, Claude, or Gemini but final text must read naturally."
 )
 
+DATA_RESEARCH_PROFILE = {
+    "fullName": "Ishan",
+    "niche": "Data research freelancer",
+    "experience": "3 years",
+    "tone": "Direct",
+    "skills": ["web research", "data collection", "spreadsheet cleanup"],
+    "pastWin": "",
+    "rate": "$20/hr",
+}
+
+DATA_RESEARCH_JOB = (
+    "We are looking for freelancers who gather data from online sources. "
+    "If you use software will be faster and cleaner data; otherwise, manual is also fine."
+)
+
 
 def test_bookkeeping_fallback_uses_current_job_not_dashboard_template():
     relevant_win = server.select_relevant_win(BOOKKEEPER_PROFILE["pastWin"], BOOKKEEPER_JOB)
@@ -150,7 +165,7 @@ def test_blocked_provider_draft_uses_rule_based_when_repair_hits_limit(monkeypat
     result = server.generate_proposal({"profile": profile, "jobDescription": job, "style": "quick"})
 
     assert result.status == 200
-    assert result.payload.get("fallback") is None
+    assert result.payload.get("fallback") == "rule_based_validator_block"
     assert "customer" in result.payload["proposal"].lower() or "support" in result.payload["proposal"].lower()
     assert ".," not in result.payload["proposal"]
     assert calls["count"] == 2
@@ -247,3 +262,45 @@ def test_virtual_assistant_fallback_uses_admin_reality_not_awkward_focus_term():
 
     findings = server.proposal_violations(proposal, profile, job, "", "quick")
     assert not server.blocking_violations(proposal, findings)
+
+
+def test_data_research_fallback_understands_online_data_gathering_not_freelancers():
+    proposal = server.build_rule_based_proposal(DATA_RESEARCH_JOB, "", "quick")
+    lowered = proposal.lower()
+
+    assert "online data gathering" in lowered
+    assert "online sources" in lowered
+    assert "clean data list" in lowered
+    assert "software" in lowered
+    assert "manual checks" in lowered
+    assert "which part of freelancers" not in lowered
+    assert "freelancers work" not in lowered
+    assert proposal.endswith("?")
+    assert "target sources" in lowered or "fields" in lowered
+
+    findings = server.proposal_violations(proposal, DATA_RESEARCH_PROFILE, DATA_RESEARCH_JOB, "", "quick")
+    assert not server.blocking_violations(proposal, findings)
+
+
+def test_validator_block_fallback_is_visible_to_frontend(monkeypatch):
+    calls = {"count": 0}
+
+    def fake_provider(*args, **kwargs):
+        calls["count"] += 1
+        if calls["count"] == 1:
+            return server.ApiResult(200, {"proposal": "Hello, I am passionate and detail-oriented."})
+        return server.error(server.USER_RETRY_MESSAGE, 503)
+
+    monkeypatch.setattr(server, "github_models_token", lambda: "test-token")
+    monkeypatch.setattr(server, "request_github_models", fake_provider)
+
+    result = server.generate_proposal(
+        {"profile": DATA_RESEARCH_PROFILE, "jobDescription": DATA_RESEARCH_JOB, "style": "quick"}
+    )
+
+    assert result.status == 200
+    assert result.payload.get("fallback") == "rule_based_validator_block"
+    lowered = result.payload["proposal"].lower()
+    assert "online data gathering" in lowered
+    assert "which part of freelancers" not in lowered
+    assert calls["count"] == 2
