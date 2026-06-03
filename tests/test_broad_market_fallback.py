@@ -364,3 +364,41 @@ def test_validator_block_fallback_is_visible_to_frontend(monkeypatch):
     assert "online data gathering" in lowered
     assert "which part of freelancers" not in lowered
     assert calls["count"] == 1
+
+
+def test_figma_wordpress_revamp_data_migration_does_not_become_laravel(monkeypatch):
+    profile = {
+        "fullName": "Asha",
+        "niche": "WordPress designer and developer",
+        "experience": "5",
+        "tone": "clear",
+        "skills": ["Figma", "WordPress", "website redesign", "data migration"],
+        "pastWin": "",
+        "rate": "$35/hour",
+    }
+    job = (
+        "Need a person who can Revamp and Redesign our website.\n\n"
+        "I need a dedicated person to design a figam file for our website.\n\n"
+        "Also, have to convert the same to wordpress and migrate our data to new wordpress\n\n"
+        "Check our website memedownload.in -- Make sure to tell me the timeline with no. of pages etc."
+    )
+    monkeypatch.setattr(server, "github_models_token", lambda: "test-token")
+    monkeypatch.setattr(
+        server,
+        "request_github_models",
+        lambda *args, **kwargs: server.error(server.USER_RETRY_MESSAGE, 503),
+    )
+
+    for style in ("quick", "detailed"):
+        result = server.generate_proposal({"profile": profile, "jobDescription": job, "style": style})
+        assert result.status == 200
+        proposal = result.payload["proposal"]
+        lowered = proposal.lower()
+        assert "figma" in lowered
+        assert "wordpress" in lowered
+        assert "memedownload.in" in lowered
+        assert "page" in lowered or "pages" in lowered
+        assert "timeline" in lowered
+        assert "laravel" not in lowered
+        findings = server.proposal_violations(proposal, profile, job, "", style)
+        assert not server.blocking_violations(proposal, findings)

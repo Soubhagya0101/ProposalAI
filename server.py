@@ -693,7 +693,33 @@ def build_rule_based_proposal(job_description: str, relevant_win: str, style: st
         quick_insight = f"{opener.rstrip('.')} — {insight_2[0].lower()}{insight_2[1:]}"
         return f"{quick_insight} {proof_or_outcome} {question}"
 
-    if "wordpress" in lowered and ("laravel" in lowered or "convert" in lowered or "migration" in lowered or "rebuild" in lowered):
+    if "wordpress" in lowered and ("figma" in lowered or "redesign" in lowered or "revamp" in lowered):
+        question = "Should I count every current page on memedownload.in, or only the main templates that need redesign?" if "memedownload.in" in lowered else "Should I count every current page, or only the main templates that need redesign?"
+        opener = (
+            "The risky part of a website revamp is treating the Figma design, WordPress build, and data migration as separate jobs; "
+            "the new site can look cleaner while old content, URLs, or downloads break."
+        )
+        outcome = (
+            "I can map the current page count and timeline first, then design the Figma file and rebuild it in WordPress with the existing data carried over cleanly."
+        )
+        if style == "detailed":
+            proof = f"\n\n{relevant_win.strip().rstrip('.!?')}." if relevant_win else ""
+            return (
+                "A website revamp can fail even when the new design looks better, because the page count, old content, and migration details decide the real scope. "
+                "For memedownload.in, the first useful step is checking the current pages/templates before promising a timeline."
+                f"{proof}\n\n"
+                "I can turn that audit into a Figma redesign plan, then rebuild the approved design in WordPress and migrate the existing data without treating it like a blank site. "
+                "That gives you a timeline tied to real pages instead of a guess from the job post.\n\n"
+                f"{question}"
+            )
+        proof_or_outcome = (
+            f"{relevant_win.strip().rstrip('.!?')}. {outcome}"
+            if relevant_win
+            else outcome
+        )
+        return f"{opener} {proof_or_outcome} {question}"
+
+    if "wordpress" in lowered and ("laravel" in lowered or "convert to laravel" in lowered or "rebuild in laravel" in lowered or "laravel rebuild" in lowered):
         question = "Should the Laravel version match the current WordPress design, or can the layout be simplified during the move?"
         opener = (
             "The risky part of moving an existing WordPress site to Laravel is that the rebuild can look finished "
@@ -1557,6 +1583,18 @@ def situation_guidance(job_description: str, style: str) -> str:
             "first checkout button. Describe the finished outcome as billing that stays correct when customers switch "
             "plans, renew, or hit webhook-driven state changes. End by asking whether Stripe products and webhook "
             "handling already exist."
+        )
+    if "wordpress" in lowered and ("figma" in lowered or "redesign" in lowered or "revamp" in lowered):
+        if style == "detailed":
+            return (
+                "Open with the scope truth: a redesign is not just visuals when Figma, WordPress build, and data migration all sit in the same job. "
+                "Add depth around the risk: page count, current templates, URLs, and existing content decide the timeline more than the word revamp. "
+                "Describe the finished outcome as a Figma design plus WordPress rebuild with existing data migrated cleanly. "
+                "End by asking whether to count every current page on memedownload.in or only the main templates."
+            )
+        return (
+            "Open with the scope truth: a revamp can look clean in Figma but still fail if WordPress pages, URLs, and existing data are not mapped first. "
+            "Mention checking the current page count before timeline, then ask whether to count every current page or only main templates."
         )
     if ("wordpress" in lowered or "website" in lowered or "pages" in lowered) and (
         "slow" in lowered or "speed" in lowered or "seconds" in lowered or "load" in lowered
