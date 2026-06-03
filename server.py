@@ -1229,6 +1229,11 @@ def clean_proposal(text: str) -> str:
     cleaned = cleaned.strip().strip('"').strip()
     cleaned = re.sub(r"\bI will\b", "I'll", cleaned)
     cleaned = re.sub(r"\bI would\b", "I'd", cleaned)
+    cleaned = re.sub(r"\bsignificantly\s+impact\b", "shape", cleaned, flags=re.I)
+    cleaned = re.sub(r"\bsignificantly\s+impacts\b", "shapes", cleaned, flags=re.I)
+    cleaned = re.sub(r"\bsignificantly\b\s*", "", cleaned, flags=re.I)
+    cleaned = re.sub(r"\bseamless transition\b", "clean move", cleaned, flags=re.I)
+    cleaned = re.sub(r"\bcrucial\b", "important", cleaned, flags=re.I)
     cleaned = re.sub(r"\s+([,.!?;:])", r"\1", cleaned)
     cleaned = re.sub(r"([.!?])\s*,\s+", r"\1 ", cleaned)
     cleaned = re.sub(

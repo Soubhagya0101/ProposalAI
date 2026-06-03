@@ -39,3 +39,16 @@ def test_figma_wordpress_scope_opener_is_not_treated_as_echo():
     )
 
     assert not server.opening_echoes_brief(first_sentence, job)
+
+
+def test_clean_proposal_rewrites_common_provider_filler():
+    proposal = (
+        "The number of pages will significantly impact the timeline, making a seamless transition crucial."
+    )
+
+    cleaned = server.clean_proposal(proposal)
+
+    assert "significantly" not in cleaned.lower()
+    assert "seamless transition" not in cleaned.lower()
+    assert "crucial" not in cleaned.lower()
+    assert "shape the timeline" in cleaned.lower()
