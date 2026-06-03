@@ -18,16 +18,11 @@ from urllib.parse import parse_qs, quote, unquote, urlencode, urlparse
 
 ROOT = Path(__file__).resolve().parent
 PUBLIC_DIR = ROOT / "public"
-GITHUB_MODELS_URL = "https://models.github.ai/inference/chat/completions"
-BLUESMINDS_MODELS_URL = "https://api.bluesminds.com/v1/chat/completions"
 GROQ_MODELS_URL = "https://api.groq.com/openai/v1/chat/completions"
-GITHUB_MODEL_ID = "openai/gpt-4o-mini"
-BLUESMINDS_MODEL_ID = "gpt-4o-mini"
 GROQ_MODEL_ID = "llama-3.3-70b-versatile"
-MODEL_ID = BLUESMINDS_MODEL_ID
 USER_RETRY_MESSAGE = "Taking longer than usual - please try again."
-PROVIDER_MAX_ATTEMPTS = 3
-PROVIDER_TIMEOUT_SECONDS = 45
+PROVIDER_MAX_ATTEMPTS = 1
+PROVIDER_TIMEOUT_SECONDS = 30
 IST = timezone(timedelta(hours=5, minutes=30))
 FEEDBACK_TYPES = {
     "human": "This sounds human",
@@ -364,7 +359,7 @@ def generate_proposal(body: dict[str, Any], test_mode: bool = False) -> ApiResul
             return error(USER_RETRY_MESSAGE, 503)
         result = request_github_models(
             token,
-            "Reply with exactly this sentence: ProposalAI GitHub Models connection works.",
+            "Reply with exactly this sentence: ProposalAI Groq connection works.",
             temperature=0,
             max_tokens=80,
         )
@@ -399,23 +394,8 @@ def generate_proposal(body: dict[str, Any], test_mode: bool = False) -> ApiResul
     relevant_win = select_relevant_win(profile["pastWin"], job_description)
     guidance = situation_guidance(job_description, style)
     if not token:
-        print("[ProposalAI] Generation token is not configured; using rule-based draft.", flush=True)
-        fallback = build_rule_based_proposal(job_description, relevant_win, style)
-        fallback_findings = proposal_violations(fallback, profile, job_description, relevant_win, style)
-        fallback_blockers = blocking_violations(fallback, fallback_findings)
-        if fallback_blockers:
-            print(f"[ProposalAI] Rule-based draft blocked without token: {'; '.join(fallback_blockers)}.", flush=True)
-            return error(USER_RETRY_MESSAGE, 503)
-        return ApiResult(
-            200,
-            {
-                "model": generation_model_id(),
-                "style": style,
-                "proposal": fallback.strip(),
-                "wordCount": word_count(fallback),
-                "fallback": "rule_based_missing_token",
-            },
-        )
+        print("[ProposalAI] GROQ_API_KEY is not configured; provider generation is disabled.", flush=True)
+        return ApiResult(503, {"error": USER_RETRY_MESSAGE, "code": "MISSING_GROQ_API_KEY", "provider": "groq"})
 
     prompt = build_prompt(profile, job_description, relevant_win, guidance, style)
     result = request_github_models(token, prompt, temperature=0.42, max_tokens=620 if style == "detailed" else 320)
@@ -424,101 +404,33 @@ def generate_proposal(body: dict[str, Any], test_mode: bool = False) -> ApiResul
         fallback_findings = proposal_violations(fallback, profile, job_description, relevant_win, style)
         fallback_blockers = blocking_violations(fallback, fallback_findings)
         if fallback_blockers:
-            print(f"[ProposalAI] Provider failed and rule-based draft blocked: {'; '.join(fallback_blockers)}.", flush=True)
+            print(f"[ProposalAI] Groq failed and rule-based draft blocked: {'; '.join(fallback_blockers)}.", flush=True)
             return result
-        print(f"[ProposalAI] Provider failed with {result.status}; using rule-based draft.", flush=True)
+        print(f"[ProposalAI] Groq failed with {result.status}; using rule-based draft.", flush=True)
         return ApiResult(
             200,
             {
+                "provider": "groq",
                 "model": generation_model_id(),
                 "style": style,
                 "proposal": fallback.strip(),
                 "wordCount": word_count(fallback),
                 "fallback": "rule_based_provider_failure",
+                "fallbackReason": "groq_provider_failed",
             },
         )
 
     proposal = clean_proposal(str(result.payload["proposal"]))
     findings = proposal_violations(proposal, profile, job_description, relevant_win, style)
     blockers = blocking_violations(proposal, findings)
-    provider_repair_failed = False
-    if blockers:
-        result = request_github_models(
-            token,
-            "\n".join(
-                [
-                    "Rewrite this freelance proposal to comply with every rule below.",
-                    f"Fix these blocking issues: {', '.join(blockers)}.",
-                    "- Open immediately with a concrete detail from the client's job, not a greeting or an introduction about the freelancer.",
-                    "- The opening must add an observation the client did not write but will immediately recognize as true. Never merely restate the brief.",
-                    "- State facts and outcomes. Do not explain that the project is important, beneficial, impactful, or engaging.",
-                    "- Every sentence must state client insight, allowed proof, the finished outcome, or one necessary decision question.",
-                    "- For detailed mode, add depth about why the problem exists, what it is costing them, and what outcome they get. Do not list your methodology.",
-                    "- Past win rule: If the freelancer profile includes a past win/success story, compare it to the job description. When it is relevant to the job's platform, service, skill, industry, or outcome, include it naturally as one short proof sentence. Do not force it if unrelated. If relevant, mention the concrete outcome/metric from the past win.",
-                    "- If an allowed past win exists, include it naturally once as a proof sentence. If no allowed past win exists, skip proof completely.",
-                    (
-                        f"- Relevant past win to weave in naturally: {relevant_win}"
-                        if relevant_win
-                        else "- No past win is supplied for this job. Do not claim any previous result, similar project, client, or metric."
-                    ),
-                    "- Do not invent clients, industries, metrics, timelines, or outcomes.",
-                    "- Only mention tools, platforms, or features that appear explicitly in the job description or the freelancer profile. Never invent context.",
-                    "- If a tool, platform, or feature is not explicitly present, speak generally instead of naming it.",
-                    "- Do not borrow facts from the style example; use only the job description and allowed past win.",
-                    "- Do not mention years of experience. Use concrete proof or a concrete approach instead.",
-                    "- Ask at most one question and only when the answer changes the work.",
-                    "- Do not ask broad discovery questions such as what topics, features, or issues the client wants.",
-                    "- A question is permitted only if it identifies a technical decision such as platform or migration.",
-                    *REAL_FREELANCER_RULES,
-                    f"- Never use any of these phrases: {', '.join(FORBIDDEN_PHRASES)}.",
-                    f"- Avoid generic filler such as: {', '.join(GENERIC_FILLER)}.",
-                    "- End with one specific practical question.",
-                    "- Do not ask for confirmation or say 'proceed with this approach.'",
-                    style_rules(style),
-                    "Return only the revised proposal text.",
-                    "Never include bracket placeholders.",
-                    "",
-                    "Job description:",
-                    job_description,
-                    "",
-                    "Situation guidance:",
-                    guidance,
-                    "",
-                    "Draft to revise:",
-                    proposal,
-                ]
-            ),
-            temperature=0.35,
-            max_tokens=620 if style == "detailed" else 320,
-        )
-        if result.status != 200:
-            print(f"[ProposalAI] Provider repair failed with {result.status}; using rule-based draft.", flush=True)
-            provider_repair_failed = True
-        else:
-            proposal = clean_proposal(str(result.payload["proposal"]))
-            findings = proposal_violations(proposal, profile, job_description, relevant_win, style)
-            blockers = blocking_violations(proposal, findings)
-
-    if blockers and not provider_repair_failed:
-        result = request_github_models(
-            token,
-            build_fallback_prompt(profile, job_description, relevant_win, guidance, style),
-            temperature=0.2,
-            max_tokens=620 if style == "detailed" else 220,
-        )
-        if result.status != 200:
-            print(f"[ProposalAI] Provider fallback prompt failed with {result.status}; using rule-based draft.", flush=True)
-        else:
-            proposal = clean_proposal(str(result.payload["proposal"]))
-            findings = proposal_violations(proposal, profile, job_description, relevant_win, style)
-            blockers = blocking_violations(proposal, findings)
     used_rule_based_validator_fallback = False
     if blockers:
+        print(f"[ProposalAI] Groq draft blocked by validator; using rule-based draft without extra provider calls: {'; '.join(blockers)}.", flush=True)
         fallback = build_rule_based_proposal(job_description, relevant_win, style)
         fallback_findings = proposal_violations(fallback, profile, job_description, relevant_win, style)
         fallback_blockers = blocking_violations(fallback, fallback_findings)
         if fallback_blockers:
-            print(f"[ProposalAI] Draft blocked: {'; '.join(fallback_blockers)}.", flush=True)
+            print(f"[ProposalAI] Rule-based validator fallback blocked: {'; '.join(fallback_blockers)}.", flush=True)
             return error(USER_RETRY_MESSAGE, 502)
         proposal = fallback
         findings = fallback_findings
@@ -528,9 +440,17 @@ def generate_proposal(body: dict[str, Any], test_mode: bool = False) -> ApiResul
     if warnings:
         print(f"[ProposalAI] Draft accepted with warnings: {'; '.join(warnings)}.", flush=True)
 
-    payload = {"model": generation_model_id(), "style": style, "proposal": proposal.strip(), "wordCount": word_count(proposal)}
+    payload = {
+        "provider": "groq",
+        "model": generation_model_id(),
+        "style": style,
+        "proposal": proposal.strip(),
+        "wordCount": word_count(proposal),
+        "fallback": None,
+    }
     if used_rule_based_validator_fallback:
         payload["fallback"] = "rule_based_validator_block"
+        payload["fallbackReason"] = "groq_output_failed_validator"
     return ApiResult(200, payload)
 
 
@@ -773,6 +693,33 @@ def build_rule_based_proposal(job_description: str, relevant_win: str, style: st
         quick_insight = f"{opener.rstrip('.')} — {insight_2[0].lower()}{insight_2[1:]}"
         return f"{quick_insight} {proof_or_outcome} {question}"
 
+    if "wordpress" in lowered and ("laravel" in lowered or "convert" in lowered or "migration" in lowered or "rebuild" in lowered):
+        question = "Should the Laravel version match the current WordPress design, or can the layout be simplified during the move?"
+        opener = (
+            "The risky part of moving an existing WordPress site to Laravel is that the rebuild can look finished "
+            "while pages, forms, URLs, or SEO details quietly break."
+        )
+        outcome = (
+            "I can turn the current site into a Laravel build that keeps the useful parts of the existing site intact "
+            "instead of treating it like a fresh blank project."
+        )
+        if style == "detailed":
+            proof = f"\n\n{relevant_win.strip().rstrip('.!?')}." if relevant_win else ""
+            return (
+                "A WordPress-to-Laravel rebuild can fail even when the new code works, because the client still expects the same pages, forms, content, and search visibility to survive the move. "
+                "The real risk is losing what already works while replacing the platform underneath it."
+                f"{proof}\n\n"
+                "I can turn the existing site into a Laravel build that keeps the current business purpose intact and removes the WordPress limits that made the rebuild necessary. "
+                "The finished version should feel like a cleaner continuation of the site, not a disconnected rewrite.\n\n"
+                f"{question}"
+            )
+        proof_or_outcome = (
+            f"{relevant_win.strip().rstrip('.!?')}. I can keep this migration tied to the existing site instead of padding it with unrelated web claims."
+            if relevant_win
+            else outcome
+        )
+        return f"{opener} {proof_or_outcome} {question}"
+
     if ("wordpress" in lowered or "website" in lowered or "pages" in lowered) and (
         "slow" in lowered or "speed" in lowered or "seconds" in lowered or "load" in lowered
     ):
@@ -981,22 +928,22 @@ def practical_question_for_job(job_description: str, focus_terms: list[str]) -> 
     if "sequence" in lowered or ("email" in lowered and any(term in lowered for term in ("welcome", "campaign", "newsletter", "copy", "subscribers"))):
         return "What action should the final email ask readers to take?"
     if "video" in lowered or "youtube" in lowered:
-        return "Should the edit prioritize retention, Shorts, or captions first?"
+        return "Should the edit prioritize retention, Shorts, or captions?"
     if "customer support" in lowered or "support" in lowered:
-        return "Which support replies need the strictest tone match first?"
+        return "Which support replies need the strictest tone match?"
     if "quickbooks" in lowered or "bookkeeping" in lowered or "reconciliation" in lowered:
-        return "Which month should the first reconciliation and report cover?"
+        return "Which month should the reconciliation and report cover?"
     if "illustration" in lowered or "illustrator" in lowered or "book" in lowered:
-        return "Should the first sketch focus on the main character or one full scene?"
+        return "Should the sketch focus on the main character or one full scene?"
     if "react native" in lowered or "firebase" in lowered or "notification" in lowered:
         return "Which bug is blocking users most right now?"
     if "crm" in lowered:
-        return "Which CRM task should be handled first?"
+        return "Which CRM task should be handled before the others?"
     if "dashboard" in lowered or "looker" in lowered or "report" in lowered:
-        return "Which metric has to be trusted first in the report?"
+        return "Which metric has to be trusted most in the report?"
     if focus_terms:
-        return f"Which part of {focus_terms[0]} should be handled first?"
-    return "What constraint matters most for the first draft?"
+        return f"Which part of {focus_terms[0]} should be handled before the others?"
+    return "What constraint matters most for the draft?"
 
 
 def is_data_research_job(lowered_job_description: str) -> bool:
@@ -1303,7 +1250,7 @@ def proposal_violations(
         violations.append("broad forced question used instead of a decision-specific question")
     if any(phrase in lowered for phrase in CONFIRMATION_ENDINGS):
         violations.append("confirmation-style ending used")
-    if style == "detailed" and re.search(r"\b(?:first|next|then|finally|lastly)\b", lowered):
+    if style == "detailed" and re.search(r"(?:^|[.!?]\s+)(?:first|next|then|finally|lastly)\b", lowered):
         violations.append("detailed draft lists process steps")
     if style == "detailed" and re.search(r"\b(?:i'll|i will|we will)\b[^.!?]{0,80}\b(?:check|inspect|build|test|fix|create|set up|optimize|audit)\b", lowered):
         violations.append("detailed draft explains methodology instead of client depth")
@@ -1684,38 +1631,17 @@ def extract_text(data: Any) -> str:
 
 def github_models_token() -> str:
     load_dotenv()
-    for name in (
-        "GENERATION_API_KEY",
-        "GROQ_API_KEY",
-        "BLUESMINDS_API_KEY",
-        "GITHUB_MODELS_TOKEN",
-        "GITHUB_PAT",
-        "GITHUB_TOKEN",
-    ):
-        value = os.getenv(name, "").strip()
-        if value:
-            return value
-    return ""
+    return os.getenv("GROQ_API_KEY", "").strip()
 
 
 def generation_provider_config() -> tuple[str, str, str]:
-    """Return provider name, OpenAI-compatible chat completions URL, and model id.
+    """Return Groq provider name, chat completions URL, and model id.
 
-    Explicit GENERATION_* env vars take priority for hosted-provider testing.
-    Groq is supported directly because its free tier has more useful public-test
-    limits than GitHub Models or OpenRouter free models. BlueMinds and GitHub
-    remain fallbacks so older Render env vars keep working.
+    ProposalAI intentionally supports only Groq for generation right now so
+    Render cannot silently fall back to GitHub, BlueMinds, or custom providers.
     """
     load_dotenv()
-    explicit_url = os.getenv("GENERATION_API_URL", "").strip()
-    explicit_model = os.getenv("GENERATION_MODEL_ID", "").strip()
-    if explicit_url:
-        return "custom", explicit_url, explicit_model or MODEL_ID
-    if os.getenv("GROQ_API_KEY", "").strip():
-        return "groq", GROQ_MODELS_URL, explicit_model or GROQ_MODEL_ID
-    if os.getenv("BLUESMINDS_API_KEY", "").strip() or os.getenv("GENERATION_API_KEY", "").strip():
-        return "bluesminds", BLUESMINDS_MODELS_URL, explicit_model or BLUESMINDS_MODEL_ID
-    return "github", GITHUB_MODELS_URL, explicit_model or GITHUB_MODEL_ID
+    return "groq", GROQ_MODELS_URL, os.getenv("GROQ_MODEL_ID", "").strip() or GROQ_MODEL_ID
 
 
 def generation_model_id() -> str:

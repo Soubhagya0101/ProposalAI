@@ -15,16 +15,16 @@ It has one narrow feedback workflow: users can rate a generated proposal and res
 
 ## Runtime
 
-The browser never sees the GitHub token. The frontend calls the local server endpoint:
+The browser never sees the Groq key. The frontend calls the local server endpoint:
 
 ```text
 POST /api/generate-proposal
 ```
 
-The server calls GitHub Models:
+The server calls Groq only:
 
 ```text
-openai/gpt-4o-mini
+llama-3.3-70b-versatile
 ```
 
 Proposal style rules are applied server-side: an insightful client-first opening, one relevant win at most, profile/job-fit protection, and at most one essential question. Past wins are only supplied when their work category matches the job, so an ecommerce result is not inserted into dashboard, landing-page, or API work.
@@ -47,7 +47,8 @@ For local development, set `ALLOW_LOCAL_FEEDBACK_LOG=true` to append responses t
 Create `.env` locally:
 
 ```text
-GITHUB_MODELS_TOKEN=your-github-models-token
+GROQ_API_KEY=your-groq-api-key
+GROQ_MODEL_ID=llama-3.3-70b-versatile
 PORT=10000
 ALLOW_LOCAL_FEEDBACK_LOG=true
 ```
@@ -77,7 +78,8 @@ Use this repo as a Docker Web Service. Do not deploy it as a Static Site, becaus
 Proposal generation requires:
 
 ```text
-GITHUB_MODELS_TOKEN
+GROQ_API_KEY
+GROQ_MODEL_ID=llama-3.3-70b-versatile
 ```
 
 To retain feedback in Google Sheets, also configure:

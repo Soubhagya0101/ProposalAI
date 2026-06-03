@@ -137,7 +137,7 @@ def test_provider_failure_can_return_valid_rule_based_draft(monkeypatch):
     assert result.payload.get("fallback") == "rule_based_provider_failure"
 
 
-def test_blocked_provider_draft_uses_rule_based_when_repair_hits_limit(monkeypatch):
+def test_blocked_provider_draft_uses_rule_based_without_extra_provider_calls(monkeypatch):
     profile = {
         "fullName": "Maya",
         "niche": "Customer support specialist",
@@ -168,7 +168,7 @@ def test_blocked_provider_draft_uses_rule_based_when_repair_hits_limit(monkeypat
     assert result.payload.get("fallback") == "rule_based_validator_block"
     assert "customer" in result.payload["proposal"].lower() or "support" in result.payload["proposal"].lower()
     assert ".," not in result.payload["proposal"]
-    assert calls["count"] == 2
+    assert calls["count"] == 1
 
 
 def test_broad_public_test_does_not_block_adjacent_freelance_categories(monkeypatch):
@@ -284,6 +284,64 @@ def test_data_research_fallback_understands_online_data_gathering_not_freelancer
     assert not server.blocking_violations(proposal, findings)
 
 
+def test_wordpress_laravel_client_history_blob_generates_relevant_quick_and_detailed_fallback(monkeypatch):
+    profile = {
+        "fullName": "Dev Test",
+        "niche": "WordPress Laravel Developer",
+        "experience": "5 years",
+        "tone": "Direct",
+        "skills": ["WordPress", "Laravel", "SEO", "site migration"],
+        "pastWin": "",
+        "rate": "$25/hr",
+    }
+    job = (
+        "Corporate Lawyer Needed – NDA & Agreement Drafting for Game Development Project\n"
+        "Mar 2026 - Apr 2026\n"
+        "Fixed-price $5.00\n"
+        "Other open jobs by this Client (2)\n"
+        "Experienced Laravel Developer Needed – Convert Existing WordPress Website to Laravel\n"
+        "Fixed-price\n"
+        "AI-Powered WordPress SEO & Social Media Marketing Expert (Lead Generation Focus)\n"
+        "Fixed-price"
+    )
+    monkeypatch.setattr(server, "github_models_token", lambda: "test-token")
+    monkeypatch.setattr(
+        server,
+        "request_github_models",
+        lambda *args, **kwargs: server.error(server.USER_RETRY_MESSAGE, 503),
+    )
+
+    for style in ("quick", "detailed"):
+        result = server.generate_proposal({"profile": profile, "jobDescription": job, "style": style})
+        assert result.status == 200
+        assert result.payload.get("fallback") == "rule_based_provider_failure"
+        proposal = result.payload["proposal"]
+        lowered = proposal.lower()
+        assert "wordpress" in lowered
+        assert "laravel" in lowered
+        assert "slow wordpress mobile load" not in lowered
+        assert "shared hosting" not in lowered
+        findings = server.proposal_violations(proposal, profile, job, "", style)
+        assert not server.blocking_violations(proposal, findings)
+
+
+def test_detailed_validator_allows_non_step_words_like_first_reply():
+    proposal = (
+        "Onboarding emails usually fail when the wording is technically correct but native readers feel the phrasing was carried over too directly. "
+        "Clients often judge the first reply by whether the freelancer notices that tone risk, not by a long language list.\n\n"
+        "I can localize the onboarding emails so the meaning stays intact and the casual tone reads naturally in Spanish. "
+        "The finished copy should feel written for the reader, not transferred from English sentence by sentence.\n\n"
+        "Should the Spanish version stay casual across every email, or only in the welcome message?"
+    )
+    job = "Need a translator to localize onboarding emails from English to Spanish and keep the tone casual."
+    profile = {"niche": "Translator", "skills": ["translation", "localization"], "pastWin": "", "experience": "3 years", "rate": "$18/hr"}
+
+    findings = server.proposal_violations(proposal, profile, job, "", "detailed")
+
+    assert "detailed draft lists process steps" not in findings
+    assert not server.blocking_violations(proposal, findings)
+
+
 def test_validator_block_fallback_is_visible_to_frontend(monkeypatch):
     calls = {"count": 0}
 
@@ -305,4 +363,4 @@ def test_validator_block_fallback_is_visible_to_frontend(monkeypatch):
     lowered = result.payload["proposal"].lower()
     assert "online data gathering" in lowered
     assert "which part of freelancers" not in lowered
-    assert calls["count"] == 2
+    assert calls["count"] == 1
