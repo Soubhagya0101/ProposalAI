@@ -148,6 +148,8 @@ INSIGHT_MARKERS = (
     "overkill",
     "too basic",
     "without",
+    "not just",
+    "more than",
     "hard part",
     "usually",
     "often",

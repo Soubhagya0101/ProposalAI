@@ -26,3 +26,16 @@ def test_quick_provider_draft_under_fifty_words_can_pass_when_specific():
 
     assert server.word_count(proposal) == 44
     assert not server.blocking_violations(proposal, findings)
+
+
+def test_figma_wordpress_scope_opener_is_not_treated_as_echo():
+    first_sentence = (
+        "A redesign is not just about visuals when it involves Figma design, "
+        "WordPress build, and data migration - the scope is broader and more complex."
+    )
+    job = (
+        "Need a person who can revamp and redesign our website, design a Figma file, "
+        "convert the same to WordPress, and migrate our data to new WordPress."
+    )
+
+    assert not server.opening_echoes_brief(first_sentence, job)
