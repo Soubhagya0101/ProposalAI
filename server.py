@@ -1099,6 +1099,7 @@ def build_prompt(profile: dict[str, Any], job_description: str, relevant_win: st
             "- If no relevant past win is provided, skip the proof sentence completely.",
             "- Never write 'I have worked on similar projects' or invent a replacement proof point.",
             "- Never invent a past result, number, client, industry, timeline, or outcome that is not in the profile.",
+            "- Do not add any numeric claim unless that exact number appears in the job description or profile. If tempted to write a statistic like 8 seconds, say the qualitative risk instead.",
             "- Do not mention years of experience. A short proposal has no room for background padding.",
             "- Use I only for the supplied proof point or a direct outcome statement.",
             "- Ask no question unless its answer genuinely changes the work. Maximum one question. Avoid broad questions about topics, features, or issues.",
@@ -1224,8 +1225,8 @@ def proposal_violations(
     if style == "detailed":
         if not 90 <= count <= 130:
             violations.append(f"detailed draft has {count} words; required range is 90 to 130")
-    elif not 50 <= count <= 80:
-        violations.append(f"quick draft has {count} words; required range is 50 to 80")
+    elif not 40 <= count <= 85:
+        violations.append(f"quick draft has {count} words; required range is 40 to 85")
     job_description_lower = job_description.lower()
     used = [phrase for phrase in FORBIDDEN_PHRASES if phrase in lowered and phrase not in job_description_lower]
     if used:
