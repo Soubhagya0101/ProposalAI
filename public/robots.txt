@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://proposalai-xv14.onrender.com/sitemap.xml

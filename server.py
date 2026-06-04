@@ -18,6 +18,20 @@ from urllib.parse import parse_qs, quote, unquote, urlencode, urlparse
 
 ROOT = Path(__file__).resolve().parent
 PUBLIC_DIR = ROOT / "public"
+SEO_ROUTES = {
+    "/free-ai-proposal-generator-for-freelancers": PUBLIC_DIR / "seo" / "free-ai-proposal-generator-for-freelancers.html",
+    "/upwork-proposal-generator": PUBLIC_DIR / "seo" / "upwork-proposal-generator.html",
+    "/web-design-proposal-generator": PUBLIC_DIR / "seo" / "web-design-proposal-generator.html",
+    "/consulting-proposal-generator": PUBLIC_DIR / "seo" / "consulting-proposal-generator.html",
+    "/examples/freelance-proposal-examples": PUBLIC_DIR / "seo" / "examples__freelance-proposal-examples.html",
+    "/examples/upwork-proposal-examples": PUBLIC_DIR / "seo" / "examples__upwork-proposal-examples.html",
+    "/templates/web-design-proposal-template": PUBLIC_DIR / "seo" / "templates__web-design-proposal-template.html",
+    "/templates/consulting-proposal-template": PUBLIC_DIR / "seo" / "templates__consulting-proposal-template.html",
+    "/guides/upwork-proposals-no-replies": PUBLIC_DIR / "seo" / "guides__upwork-proposals-no-replies.html",
+    "/guides/follow-up-after-proposal": PUBLIC_DIR / "seo" / "guides__follow-up-after-proposal.html",
+    "/tools/proposal-opener-checker": PUBLIC_DIR / "seo" / "tools__proposal-opener-checker.html",
+    "/tools/scope-creep-checker": PUBLIC_DIR / "seo" / "tools__scope-creep-checker.html",
+}
 GROQ_MODELS_URL = "https://api.groq.com/openai/v1/chat/completions"
 GROQ_MODEL_ID = "llama-3.3-70b-versatile"
 USER_RETRY_MESSAGE = "Taking longer than usual - please try again."
@@ -266,6 +280,13 @@ class ProposalAIHandler(BaseHTTPRequestHandler):
         if path in {"/", "/index.html", "/public/index.html"}:
             self._send_file_head(PUBLIC_DIR / "index.html", "text/html; charset=utf-8")
             return
+        if path in SEO_ROUTES:
+            self._send_file_head(SEO_ROUTES[path], "text/html; charset=utf-8")
+            return
+        if path in {"/sitemap.xml", "/robots.txt"}:
+            content_type = "application/xml; charset=utf-8" if path == "/sitemap.xml" else "text/plain; charset=utf-8"
+            self._send_file_head(PUBLIC_DIR / path.lstrip("/"), content_type)
+            return
         self.send_error(404, "Not found")
 
     def do_GET(self) -> None:
@@ -283,6 +304,13 @@ class ProposalAIHandler(BaseHTTPRequestHandler):
             return
         if path in {"/", "/index.html", "/public/index.html"}:
             self._send_file(PUBLIC_DIR / "index.html", "text/html; charset=utf-8")
+            return
+        if path in SEO_ROUTES:
+            self._send_file(SEO_ROUTES[path], "text/html; charset=utf-8")
+            return
+        if path in {"/sitemap.xml", "/robots.txt"}:
+            content_type = "application/xml; charset=utf-8" if path == "/sitemap.xml" else "text/plain; charset=utf-8"
+            self._send_file(PUBLIC_DIR / path.lstrip("/"), content_type)
             return
         self.send_error(404, "Not found")
 
