@@ -25,7 +25,7 @@ def test_short_crm_job_fallback_still_returns_valid_quick_proposal():
     assert not server.blocking_violations(proposal, findings)
 
 
-def test_provider_failure_returns_valid_crm_fallback(monkeypatch):
+def test_provider_failure_returns_visible_groq_error_without_crm_fallback(monkeypatch):
     monkeypatch.setattr(server, "github_models_token", lambda: "test-token")
     monkeypatch.setattr(
         server,
@@ -37,6 +37,7 @@ def test_provider_failure_returns_valid_crm_fallback(monkeypatch):
         {"profile": CRM_PROFILE, "jobDescription": CRM_JOB, "style": "quick"}
     )
 
-    assert result.status == 200
-    assert result.payload["fallback"] == "rule_based_provider_failure"
-    assert "crm" in result.payload["proposal"].lower()
+    assert result.status == 503
+    assert result.payload["code"] == "GROQ_PROVIDER_FAILED"
+    assert result.payload.get("fallback") is None
+    assert "proposal" not in result.payload

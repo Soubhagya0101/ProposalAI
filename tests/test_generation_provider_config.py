@@ -5,6 +5,7 @@ import server
 
 
 def clear_generation_env(monkeypatch):
+    monkeypatch.setattr(server, "load_dotenv", lambda *args, **kwargs: None)
     for name in (
         "BLUESMINDS_API_KEY",
         "GENERATION_API_KEY",

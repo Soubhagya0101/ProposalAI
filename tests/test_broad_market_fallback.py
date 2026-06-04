@@ -119,7 +119,7 @@ def test_clean_proposal_repairs_provider_punctuation_after_past_win():
     assert "Could you share" in proposal
 
 
-def test_provider_failure_can_return_valid_rule_based_draft(monkeypatch):
+def test_provider_failure_returns_visible_groq_error_without_rule_based_fallback(monkeypatch):
     monkeypatch.setattr(server, "github_models_token", lambda: "test-token")
     monkeypatch.setattr(
         server,
@@ -131,13 +131,14 @@ def test_provider_failure_can_return_valid_rule_based_draft(monkeypatch):
         {"profile": EMAIL_PROFILE, "jobDescription": EMAIL_JOB, "style": "quick"}
     )
 
-    assert result.status == 200
-    proposal = result.payload["proposal"]
-    assert "email" in proposal.lower() or "sequence" in proposal.lower() or "subscribers" in proposal.lower()
-    assert result.payload.get("fallback") == "rule_based_provider_failure"
+    assert result.status == 503
+    assert result.payload["provider"] == "groq"
+    assert result.payload["code"] == "GROQ_PROVIDER_FAILED"
+    assert result.payload.get("fallback") is None
+    assert "proposal" not in result.payload
 
 
-def test_blocked_provider_draft_uses_rule_based_without_extra_provider_calls(monkeypatch):
+def test_blocked_provider_draft_returns_visible_validator_error_without_fallback(monkeypatch):
     profile = {
         "fullName": "Maya",
         "niche": "Customer support specialist",
@@ -164,10 +165,11 @@ def test_blocked_provider_draft_uses_rule_based_without_extra_provider_calls(mon
 
     result = server.generate_proposal({"profile": profile, "jobDescription": job, "style": "quick"})
 
-    assert result.status == 200
-    assert result.payload.get("fallback") == "rule_based_validator_block"
-    assert "customer" in result.payload["proposal"].lower() or "support" in result.payload["proposal"].lower()
-    assert ".," not in result.payload["proposal"]
+    assert result.status == 502
+    assert result.payload["code"] == "GROQ_VALIDATOR_BLOCKED"
+    assert result.payload["provider"] == "groq"
+    assert result.payload.get("fallback") is None
+    assert "proposal" not in result.payload
     assert calls["count"] == 1
 
 
@@ -195,8 +197,9 @@ def test_broad_public_test_does_not_block_adjacent_freelance_categories(monkeypa
 
     for job in jobs:
         result = server.generate_proposal({"profile": profile, "jobDescription": job, "style": "quick"})
-        assert result.status == 200
-        assert result.payload.get("fallback") == "rule_based_provider_failure"
+        assert result.status == 503
+        assert result.payload["code"] == "GROQ_PROVIDER_FAILED"
+        assert result.payload.get("fallback") is None
 
 
 def test_prompt_uses_real_freelancer_buyer_psychology_rules():
@@ -284,7 +287,7 @@ def test_data_research_fallback_understands_online_data_gathering_not_freelancer
     assert not server.blocking_violations(proposal, findings)
 
 
-def test_wordpress_laravel_client_history_blob_generates_relevant_quick_and_detailed_fallback(monkeypatch):
+def test_wordpress_laravel_client_history_blob_rule_based_helper_stays_relevant(monkeypatch):
     profile = {
         "fullName": "Dev Test",
         "niche": "WordPress Laravel Developer",
@@ -304,18 +307,8 @@ def test_wordpress_laravel_client_history_blob_generates_relevant_quick_and_deta
         "AI-Powered WordPress SEO & Social Media Marketing Expert (Lead Generation Focus)\n"
         "Fixed-price"
     )
-    monkeypatch.setattr(server, "github_models_token", lambda: "test-token")
-    monkeypatch.setattr(
-        server,
-        "request_github_models",
-        lambda *args, **kwargs: server.error(server.USER_RETRY_MESSAGE, 503),
-    )
-
     for style in ("quick", "detailed"):
-        result = server.generate_proposal({"profile": profile, "jobDescription": job, "style": style})
-        assert result.status == 200
-        assert result.payload.get("fallback") == "rule_based_provider_failure"
-        proposal = result.payload["proposal"]
+        proposal = server.build_rule_based_proposal(job, "", style)
         lowered = proposal.lower()
         assert "wordpress" in lowered
         assert "laravel" in lowered
@@ -342,7 +335,7 @@ def test_detailed_validator_allows_non_step_words_like_first_reply():
     assert not server.blocking_violations(proposal, findings)
 
 
-def test_validator_block_fallback_is_visible_to_frontend(monkeypatch):
+def test_validator_block_error_is_visible_to_frontend(monkeypatch):
     calls = {"count": 0}
 
     def fake_provider(*args, **kwargs):
@@ -358,15 +351,14 @@ def test_validator_block_fallback_is_visible_to_frontend(monkeypatch):
         {"profile": DATA_RESEARCH_PROFILE, "jobDescription": DATA_RESEARCH_JOB, "style": "quick"}
     )
 
-    assert result.status == 200
-    assert result.payload.get("fallback") == "rule_based_validator_block"
-    lowered = result.payload["proposal"].lower()
-    assert "online data gathering" in lowered
-    assert "which part of freelancers" not in lowered
+    assert result.status == 502
+    assert result.payload["code"] == "GROQ_VALIDATOR_BLOCKED"
+    assert result.payload.get("fallback") is None
+    assert "proposal" not in result.payload
     assert calls["count"] == 1
 
 
-def test_figma_wordpress_revamp_data_migration_does_not_become_laravel(monkeypatch):
+def test_figma_wordpress_revamp_data_migration_rule_based_helper_does_not_become_laravel(monkeypatch):
     profile = {
         "fullName": "Asha",
         "niche": "WordPress designer and developer",
@@ -382,17 +374,8 @@ def test_figma_wordpress_revamp_data_migration_does_not_become_laravel(monkeypat
         "Also, have to convert the same to wordpress and migrate our data to new wordpress\n\n"
         "Check our website memedownload.in -- Make sure to tell me the timeline with no. of pages etc."
     )
-    monkeypatch.setattr(server, "github_models_token", lambda: "test-token")
-    monkeypatch.setattr(
-        server,
-        "request_github_models",
-        lambda *args, **kwargs: server.error(server.USER_RETRY_MESSAGE, 503),
-    )
-
     for style in ("quick", "detailed"):
-        result = server.generate_proposal({"profile": profile, "jobDescription": job, "style": style})
-        assert result.status == 200
-        proposal = result.payload["proposal"]
+        proposal = server.build_rule_based_proposal(job, "", style)
         lowered = proposal.lower()
         assert "figma" in lowered
         assert "wordpress" in lowered

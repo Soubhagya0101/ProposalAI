@@ -1058,8 +1058,7 @@
         proposalOutput.className = "proposal";
         const styleLabel = selectedStyle() === "detailed" ? "Detailed" : "Quick";
         const words = data.wordCount || wordCount(proposal);
-        const sourceLabel = data.fallback ? "Fallback draft" : "Groq draft";
-        outputMeta.textContent = `${styleLabel} - ${words} words. ${sourceLabel}. Ready to copy.`;
+        outputMeta.textContent = `${styleLabel} - ${words} words. Groq draft. Ready to copy.`;
         copyBtn.classList.remove("hidden");
         showFeedback(profile, job, selectedStyle(), words);
         setStatus(generateStatus, "Proposal generated.", "success");

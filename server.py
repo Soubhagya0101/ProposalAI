@@ -402,43 +402,36 @@ def generate_proposal(body: dict[str, Any], test_mode: bool = False) -> ApiResul
     prompt = build_prompt(profile, job_description, relevant_win, guidance, style)
     result = request_github_models(token, prompt, temperature=0.42, max_tokens=620 if style == "detailed" else 320)
     if result.status != 200:
-        fallback = build_rule_based_proposal(job_description, relevant_win, style)
-        fallback_findings = proposal_violations(fallback, profile, job_description, relevant_win, style)
-        fallback_blockers = blocking_violations(fallback, fallback_findings)
-        if fallback_blockers:
-            print(f"[ProposalAI] Groq failed and rule-based draft blocked: {'; '.join(fallback_blockers)}.", flush=True)
-            return result
-        print(f"[ProposalAI] Groq failed with {result.status}; using rule-based draft.", flush=True)
+        print(f"[ProposalAI] Groq failed with {result.status}; no local fallback is enabled.", flush=True)
         return ApiResult(
-            200,
+            result.status,
             {
+                **result.payload,
                 "provider": "groq",
                 "model": generation_model_id(),
-                "style": style,
-                "proposal": fallback.strip(),
-                "wordCount": word_count(fallback),
-                "fallback": "rule_based_provider_failure",
-                "fallbackReason": "groq_provider_failed",
+                "fallback": None,
+                "code": result.payload.get("code") or "GROQ_PROVIDER_FAILED",
             },
         )
 
     proposal = clean_proposal(str(result.payload["proposal"]))
     findings = proposal_violations(proposal, profile, job_description, relevant_win, style)
     blockers = blocking_violations(proposal, findings)
-    used_rule_based_validator_fallback = False
     if blockers:
-        print(f"[ProposalAI] Groq draft blocked by validator; using rule-based draft without extra provider calls: {'; '.join(blockers)}.", flush=True)
-        fallback = build_rule_based_proposal(job_description, relevant_win, style)
-        fallback_findings = proposal_violations(fallback, profile, job_description, relevant_win, style)
-        fallback_blockers = blocking_violations(fallback, fallback_findings)
-        if fallback_blockers:
-            print(f"[ProposalAI] Rule-based validator fallback blocked: {'; '.join(fallback_blockers)}.", flush=True)
-            return error(USER_RETRY_MESSAGE, 502)
-        proposal = fallback
-        findings = fallback_findings
-        used_rule_based_validator_fallback = True
+        print(f"[ProposalAI] Groq draft blocked by validator; no local fallback is enabled: {'; '.join(blockers)}.", flush=True)
+        return ApiResult(
+            502,
+            {
+                "error": "Groq returned a draft that failed quality checks. Try generating again.",
+                "code": "GROQ_VALIDATOR_BLOCKED",
+                "provider": "groq",
+                "model": generation_model_id(),
+                "fallback": None,
+                "violations": blockers[:5],
+            },
+        )
 
-    warnings = [finding for finding in findings if finding not in blockers]
+    warnings = findings
     if warnings:
         print(f"[ProposalAI] Draft accepted with warnings: {'; '.join(warnings)}.", flush=True)
 
@@ -450,9 +443,6 @@ def generate_proposal(body: dict[str, Any], test_mode: bool = False) -> ApiResul
         "wordCount": word_count(proposal),
         "fallback": None,
     }
-    if used_rule_based_validator_fallback:
-        payload["fallback"] = "rule_based_validator_block"
-        payload["fallbackReason"] = "groq_output_failed_validator"
     return ApiResult(200, payload)
 
 

@@ -38,9 +38,9 @@ def test_frontend_shows_server_errors_instead_of_generic_retry_only():
     assert "setStatus(generateStatus, message || RETRY_MESSAGE, \"error\");" in SOURCE
 
 
-def test_frontend_marks_groq_vs_fallback_source_in_output_meta():
-    assert 'const sourceLabel = data.fallback ? "Fallback draft" : "Groq draft";' in SOURCE
-    assert "${sourceLabel}. Ready to copy." in SOURCE
+def test_frontend_marks_successful_output_as_groq_source_only():
+    assert 'Fallback draft' not in SOURCE
+    assert 'Groq draft. Ready to copy.' in SOURCE
 
 
 def test_successful_generation_starts_cooldown_and_shows_wait_message():
