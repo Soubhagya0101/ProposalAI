@@ -19,6 +19,8 @@ from urllib.parse import parse_qs, quote, unquote, urlencode, urlparse
 ROOT = Path(__file__).resolve().parent
 PUBLIC_DIR = ROOT / "public"
 INDEXNOW_KEY = "proposalai-indexnow-20260604"
+GOOGLE_SITE_VERIFICATION_FILE = "google79e710d8dc65418b.html"
+STATIC_TEXT_ROUTES = {"/sitemap.xml", "/robots.txt", f"/{INDEXNOW_KEY}.txt", f"/{GOOGLE_SITE_VERIFICATION_FILE}"}
 SEO_ROUTES = {
     "/free-ai-proposal-generator-for-freelancers": PUBLIC_DIR / "seo" / "free-ai-proposal-generator-for-freelancers.html",
     "/upwork-proposal-generator": PUBLIC_DIR / "seo" / "upwork-proposal-generator.html",
@@ -284,7 +286,7 @@ class ProposalAIHandler(BaseHTTPRequestHandler):
         if path in SEO_ROUTES:
             self._send_file_head(SEO_ROUTES[path], "text/html; charset=utf-8")
             return
-        if path in {"/sitemap.xml", "/robots.txt", f"/{INDEXNOW_KEY}.txt"}:
+        if path in STATIC_TEXT_ROUTES:
             content_type = "application/xml; charset=utf-8" if path == "/sitemap.xml" else "text/plain; charset=utf-8"
             self._send_file_head(PUBLIC_DIR / path.lstrip("/"), content_type)
             return
@@ -309,7 +311,7 @@ class ProposalAIHandler(BaseHTTPRequestHandler):
         if path in SEO_ROUTES:
             self._send_file(SEO_ROUTES[path], "text/html; charset=utf-8")
             return
-        if path in {"/sitemap.xml", "/robots.txt", f"/{INDEXNOW_KEY}.txt"}:
+        if path in STATIC_TEXT_ROUTES:
             content_type = "application/xml; charset=utf-8" if path == "/sitemap.xml" else "text/plain; charset=utf-8"
             self._send_file(PUBLIC_DIR / path.lstrip("/"), content_type)
             return

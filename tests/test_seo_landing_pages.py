@@ -54,3 +54,11 @@ def test_indexnow_key_file_is_served_by_server():
     assert 'INDEXNOW_KEY = "proposalai-indexnow-20260604"' in SERVER
     assert (ROOT / "public" / "proposalai-indexnow-20260604.txt").read_text(encoding="utf-8").strip() == "proposalai-indexnow-20260604"
     assert 'f"/{INDEXNOW_KEY}.txt"' in SERVER
+
+
+def test_google_site_verification_file_is_served_by_server():
+    assert 'GOOGLE_SITE_VERIFICATION_FILE = "google79e710d8dc65418b.html"' in SERVER
+    assert (
+        ROOT / "public" / "google79e710d8dc65418b.html"
+    ).read_text(encoding="utf-8").strip() == "google-site-verification: google79e710d8dc65418b.html"
+    assert 'f"/{GOOGLE_SITE_VERIFICATION_FILE}"' in SERVER
