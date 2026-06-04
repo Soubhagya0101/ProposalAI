@@ -369,7 +369,11 @@ class ProposalAIHandler(BaseHTTPRequestHandler):
         if not path.exists():
             self.send_error(404, "Not found")
             return
-        self._send_empty(200, content_type or mimetypes.guess_type(str(path))[0] or "application/octet-stream")
+        self.send_response(200)
+        self.send_header("Content-Type", content_type or mimetypes.guess_type(str(path))[0] or "application/octet-stream")
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("Content-Length", str(path.stat().st_size))
+        self.end_headers()
 
     def _send_file(self, path: Path, content_type: str | None = None) -> None:
         if not path.exists():
