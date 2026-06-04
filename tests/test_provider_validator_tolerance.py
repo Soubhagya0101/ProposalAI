@@ -41,6 +41,28 @@ def test_figma_wordpress_scope_opener_is_not_treated_as_echo():
     assert not server.opening_echoes_brief(first_sentence, job)
 
 
+def test_copywriting_opener_with_real_observation_is_not_treated_as_echo():
+    first_sentence = (
+        "Homepage copy can sound clear and still leave visitors unsure what the service actually does."
+    )
+    job = (
+        "Need a freelancer to rewrite our homepage copy so it sounds clear, less generic, "
+        "and helps visitors understand our service quickly."
+    )
+
+    assert not server.opening_echoes_brief(first_sentence, job)
+
+
+def test_flat_copywriting_restatement_is_treated_as_echo():
+    first_sentence = "Homepage copy needs rewriting so visitors understand the service quickly."
+    job = (
+        "Need a freelancer to rewrite our homepage copy so it sounds clear, less generic, "
+        "and helps visitors understand our service quickly."
+    )
+
+    assert server.opening_echoes_brief(first_sentence, job)
+
+
 def test_clean_proposal_rewrites_common_provider_filler():
     proposal = (
         "The number of pages will significantly impact the timeline, making a seamless transition crucial."

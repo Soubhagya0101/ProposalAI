@@ -181,6 +181,7 @@ INSIGHT_MARKERS = (
     "mismatch",
     "drift",
     "transition",
+    "still",
 )
 DOMAIN_KEYWORDS = {
     "development": {
@@ -1143,6 +1144,7 @@ def build_prompt(profile: dict[str, Any], job_description: str, relevant_win: st
             "- Never begin with a greeting, freelancer introduction, years of experience, or profile summary.",
             "- The first sentence must say something the client did not write but will immediately recognize as true.",
             "- The opener must show you understand the situation: why this problem exists, what it is costing them, or what constraint matters.",
+            "- In the first sentence, use one concrete insight marker naturally: risk, without, not just, often, usually, worst, or still. This avoids a flat restatement.",
             "- Never restate the job description as the opening line.",
             "- The first sentence must not contain I, I'm, my, or me. Do not begin with a greeting or a description of the freelancer.",
             "- Only mention tools, platforms, or features that appear explicitly in the job description or the freelancer profile. Never invent context.",
@@ -1530,7 +1532,9 @@ def opening_echoes_brief(first_sentence: str, job_description: str) -> bool:
         return True
     opening_tokens = meaningful_tokens(first_sentence)
     job_tokens = meaningful_tokens(job_description)
-    return bool(opening_tokens) and len(opening_tokens.intersection(job_tokens)) >= 3 and not any(
+    overlap = opening_tokens.intersection(job_tokens)
+    overlap_ratio = len(overlap) / max(len(opening_tokens), 1)
+    return bool(opening_tokens) and len(overlap) >= 4 and overlap_ratio >= 0.75 and not any(
         marker in lowered for marker in INSIGHT_MARKERS
     )
 
