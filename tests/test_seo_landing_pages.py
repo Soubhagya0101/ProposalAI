@@ -48,3 +48,9 @@ def test_sitemap_lists_all_seo_urls():
         assert f"https://proposalai-xv14.onrender.com/{slug}" in sitemap
     robots = (ROOT / "public" / "robots.txt").read_text(encoding="utf-8")
     assert "Sitemap: https://proposalai-xv14.onrender.com/sitemap.xml" in robots
+
+
+def test_indexnow_key_file_is_served_by_server():
+    assert 'INDEXNOW_KEY = "proposalai-indexnow-20260604"' in SERVER
+    assert (ROOT / "public" / "proposalai-indexnow-20260604.txt").read_text(encoding="utf-8").strip() == "proposalai-indexnow-20260604"
+    assert 'f"/{INDEXNOW_KEY}.txt"' in SERVER
