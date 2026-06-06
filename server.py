@@ -1120,6 +1120,49 @@ def normalize_profile(profile: Any) -> dict[str, Any] | None:
     return normalized
 
 
+ROLE_POST_MARKERS = (
+    "responsibilities:",
+    "requirements:",
+    "qualifications:",
+    "bachelor",
+    "degree in",
+    "proven experience",
+    "marketing software",
+    "job description",
+)
+
+
+def is_role_style_post(job_description: str) -> bool:
+    lowered = job_description.lower()
+    marker_count = sum(1 for marker in ROLE_POST_MARKERS if marker in lowered)
+    has_title_line = bool(re.search(r"^\s*[A-Z][A-Za-z/&\- ]{2,60}:\s*$", job_description, flags=re.M))
+    has_responsibilities_and_requirements = "responsibilities:" in lowered and "requirements:" in lowered
+    return has_responsibilities_and_requirements or (has_title_line and marker_count >= 1) or marker_count >= 3
+
+
+def role_post_title(job_description: str) -> str:
+    match = re.search(r"^\s*([A-Za-z][A-Za-z/&\- ]{2,60}):\s*$", job_description, flags=re.M)
+    if match:
+        return re.sub(r"\s+", " ", match.group(1)).strip()
+    match = re.search(r"\b(?:looking for|hire|hiring|need)\s+(?:a|an)?\s*([A-Za-z][A-Za-z/&\- ]{2,50})\b", job_description, flags=re.I)
+    return re.sub(r"\s+", " ", match.group(1)).strip() if match else "this role"
+
+
+def role_post_guidance(job_description: str) -> str:
+    if not is_role_style_post(job_description):
+        return ""
+    title = role_post_title(job_description)
+    return "\n".join(
+        [
+            "Role-style post detected:",
+            f"- Treat this as an application/proposal for the {title} role, not as a product deliverable brief.",
+            "- Write in first-person freelancer/applicant voice after the opening insight: I can help..., I would focus..., I'd track...",
+            f"- Never write 'You'll have a {title.lower()}', 'the company needs', 'the ideal candidate', or 'this role requires'.",
+            "- Do not summarize the job listing back to the client. Say how the freelancer would handle the role's real risk.",
+            "- For marketing/manager roles, focus on audience clarity, campaign performance, sales/product alignment, reporting, and practical tool/channel questions.",
+        ]
+    )
+
 def build_prompt(profile: dict[str, Any], job_description: str, relevant_win: str, guidance: str, style: str) -> str:
     profile_lines = [
         f"Name: {profile['fullName']}",
@@ -1151,6 +1194,7 @@ def build_prompt(profile: dict[str, Any], job_description: str, relevant_win: st
             "- Ground every specific claim in either the job description or the freelancer profile. If a tool, platform, or feature is not explicitly present, speak generally instead of naming it.",
             "- Do not add examples like Figma, signup flow, CRM, Stripe, dashboards, apps, etc. unless present in the input.",
             "- Past win rule: If the freelancer profile includes a past win/success story, compare it to the job description. When it is relevant to the job's platform, service, skill, industry, or outcome, include it naturally as one short proof sentence. Do not force it if unrelated. Do not copy the past win as a separate case study; weave it into the proposal. If relevant, mention the concrete outcome/metric from the past win.",
+            role_post_guidance(job_description),
             "- If no relevant past win is provided, skip the proof sentence completely.",
             "- Never write 'I have worked on similar projects' or invent a replacement proof point.",
             "- Never invent a past result, number, client, industry, timeline, or outcome that is not in the profile.",
@@ -1231,6 +1275,7 @@ def build_fallback_prompt(
             style_rules(style),
             *format_instructions,
             "No greeting. No general benefits. No invented deliverables. No years of experience.",
+            role_post_guidance(job_description),
             *REAL_FREELANCER_RULES,
             "Only mention tools, platforms, or features that appear explicitly in the job description or the freelancer profile. Never invent context.",
             "If a tool, platform, or feature is not explicitly present, speak generally instead of naming it.",
@@ -1265,6 +1310,9 @@ def clean_proposal(text: str) -> str:
     cleaned = re.sub(r"\bseamlessly\b", "cleanly", cleaned, flags=re.I)
     cleaned = re.sub(r"\bseamless\b", "clean", cleaned, flags=re.I)
     cleaned = re.sub(r"\bfully functional\b", "working", cleaned, flags=re.I)
+    cleaned = re.sub(r"\bThe company needs\b", "The team needs", cleaned, flags=re.I)
+    cleaned = re.sub(r"\bthe ideal candidate\b", "the right person", cleaned, flags=re.I)
+    cleaned = re.sub(r"\bthis role requires\b", "this work needs", cleaned, flags=re.I)
     cleaned = re.sub(r"\bcrucial\b", "important", cleaned, flags=re.I)
     cleaned = re.sub(r"\s+([,.!?;:])", r"\1", cleaned)
     cleaned = re.sub(r"([.!?])\s*,\s+", r"\1 ", cleaned)
@@ -1299,6 +1347,17 @@ def proposal_violations(
     filler = [phrase for phrase in GENERIC_FILLER if phrase in lowered and phrase not in job_description_lower]
     if filler:
         violations.append(f"generic filler used: {', '.join(filler)}")
+    if is_role_style_post(job_description):
+        title = role_post_title(job_description).lower()
+        bad_role_patterns = [
+            rf"\byou['’]?ll have (?:a|an)?\s*{re.escape(title)}\b",
+            rf"\byou will have (?:a|an)?\s*{re.escape(title)}\b",
+            rf"\bthe company needs (?:a|an)?\s*{re.escape(title)}\b",
+            r"\bthe ideal candidate\b",
+            r"\bthis role requires\b",
+        ]
+        if any(re.search(pattern, lowered) for pattern in bad_role_patterns):
+            violations.append("role-style post answered as a job-description summary instead of an applicant proposal")
     if re.search(r"\byears?\s+of\b.*\bexperience\b", lowered):
         violations.append("years-of-experience padding used")
     if "[" in proposal or "]" in proposal:
@@ -1398,6 +1457,7 @@ def blocking_violations(proposal: str, findings: list[str]) -> list[str]:
             or finding == "invented similar-project proof used without a past win"
             or finding == "detailed draft lists process steps"
             or finding == "detailed draft explains methodology instead of client depth"
+            or finding == "role-style post answered as a job-description summary instead of an applicant proposal"
         ):
             blockers.append(finding)
     return list(dict.fromkeys(blockers))
