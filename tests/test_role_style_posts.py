@@ -35,6 +35,7 @@ def test_role_style_prompt_switches_to_applicant_voice_rules():
     assert "role-style post detected" in prompt
     assert "application/proposal for the marketing manager role" in prompt
     assert "never write 'you'll have a marketing manager'" in prompt
+    assert "do not use deliverable voice like 'you'll have...'" in prompt
     assert "first-person freelancer/applicant voice" in prompt
 
 
@@ -59,6 +60,27 @@ What specific marketing software and tools does the company currently use?"""
     assert "role-style post answered as a job-description summary instead of an applicant proposal" in findings
     assert "role-style post answered as a job-description summary instead of an applicant proposal" in server.blocking_violations(bad_proposal, findings)
 
+
+
+def test_role_style_validator_blocks_generic_deliverable_voice_even_without_role_title():
+    proposal = """Without clear campaign reporting, brand awareness work can look busy while sales and product still have no useful signal.
+
+Helped a small B2B team improve campaign reporting and align sales follow-up with marketing messages.
+
+You'll have a comprehensive marketing strategy that outlines specific goals and metrics for success. You'll also have a clear plan for collaborating with sales and product teams to ensure aligned marketing efforts.
+
+What specific marketing software and tools is the team currently using?"""
+
+    relevant_win = server.select_relevant_win(MARKETING_PROFILE["pastWin"], MARKETING_MANAGER_JOB)
+    findings = server.proposal_violations(
+        proposal,
+        MARKETING_PROFILE,
+        MARKETING_MANAGER_JOB,
+        relevant_win,
+        "detailed",
+    )
+
+    assert "role-style post answered as a job-description summary instead of an applicant proposal" in server.blocking_violations(proposal, findings)
 
 def test_role_style_applicant_proposal_passes_validator():
     good_proposal = """Brand awareness campaigns often fall flat when the team can see activity but not which audience, channel, or message is actually creating useful demand.

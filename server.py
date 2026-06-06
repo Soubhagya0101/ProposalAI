@@ -1157,6 +1157,7 @@ def role_post_guidance(job_description: str) -> str:
             "Role-style post detected:",
             f"- Treat this as an application/proposal for the {title} role, not as a product deliverable brief.",
             "- Write in first-person freelancer/applicant voice after the opening insight: I can help..., I would focus..., I'd track...",
+            "- In role-style posts, do not use deliverable voice like 'You'll have...' or 'You will have...'. The client is evaluating a person, not buying a packaged deliverable.",
             f"- Never write 'You'll have a {title.lower()}', 'the company needs', 'the ideal candidate', or 'this role requires'.",
             "- Do not summarize the job listing back to the client. Say how the freelancer would handle the role's real risk.",
             "- For marketing/manager roles, focus on audience clarity, campaign performance, sales/product alignment, reporting, and practical tool/channel questions.",
@@ -1350,8 +1351,11 @@ def proposal_violations(
     if is_role_style_post(job_description):
         title = role_post_title(job_description).lower()
         bad_role_patterns = [
+            r"\byou['’]?ll have\b",
+            r"\byou will have\b",
             rf"\byou['’]?ll have (?:a|an)?\s*{re.escape(title)}\b",
             rf"\byou will have (?:a|an)?\s*{re.escape(title)}\b",
+            r"\bthe company needs\b",
             rf"\bthe company needs (?:a|an)?\s*{re.escape(title)}\b",
             r"\bthe ideal candidate\b",
             r"\bthis role requires\b",
