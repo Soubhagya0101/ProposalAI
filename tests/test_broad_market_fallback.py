@@ -132,6 +132,17 @@ def test_clean_proposal_removes_common_provider_filler_before_validation():
     assert "fully functional" not in lowered
 
 
+def test_past_win_coverage_allows_human_paraphrase_without_exact_metric():
+    past_win = "Completed 3 healthcare websites with mobile-friendly booking flows"
+    proposal = (
+        "A WordPress redesign for a dental clinic is not just a new look when booking, SEO, and mobile pages all affect launch. "
+        "My healthcare booking work helps keep the patient path tied to the site structure instead of treating booking as an afterthought. "
+        "Should the first pass count every current page or only the main templates?"
+    )
+
+    assert server.past_win_covered(proposal, past_win)
+
+
 def test_provider_failure_returns_visible_groq_error_without_rule_based_fallback(monkeypatch):
     monkeypatch.setattr(server, "github_models_token", lambda: "test-token")
     monkeypatch.setattr(

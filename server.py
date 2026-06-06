@@ -1210,7 +1210,7 @@ def build_fallback_prompt(
     )
     format_instructions = (
         [
-            "Detailed mode is 90 to 130 words.",
+            "Detailed mode is 90 to 150 words.",
             "Paragraph 1: exactly 2 sentences with an insight about why the client's situation is risky or costly.",
             "Paragraph 2: 1 to 2 sentences of relevant past-win proof only if supplied; otherwise omit this paragraph.",
             "Paragraph 3: exactly 2 sentences describing the finished outcome the client will have.",
@@ -1288,8 +1288,8 @@ def proposal_violations(
     lowered = proposal.lower()
     count = word_count(proposal)
     if style == "detailed":
-        if not 90 <= count <= 130:
-            violations.append(f"detailed draft has {count} words; required range is 90 to 130")
+        if not 90 <= count <= 150:
+            violations.append(f"detailed draft has {count} words; required range is 90 to 150")
     elif not 40 <= count <= 85:
         violations.append(f"quick draft has {count} words; required range is 40 to 85")
     job_description_lower = job_description.lower()
@@ -1474,13 +1474,15 @@ def past_win_covered(proposal: str, past_win: str) -> bool:
     win_lower = past_win.lower()
     if win_lower in proposal_lower:
         return True
-    win_numbers = numeric_tokens(past_win)
-    if win_numbers and not win_numbers.issubset(numeric_tokens(proposal)):
-        return False
     win_terms = meaningful_tokens(past_win)
     proposal_terms = meaningful_tokens(proposal)
     shared_terms = win_terms.intersection(proposal_terms)
-    return bool(shared_terms) and (not win_numbers or win_numbers.issubset(numeric_tokens(proposal)))
+    win_numbers = numeric_tokens(past_win)
+    # Providers often paraphrase a supplied proof point and omit the exact number.
+    # Treat shared concrete terms as coverage, while numeric_tokens() elsewhere still blocks invented numbers.
+    if win_numbers:
+        return len(shared_terms) >= 2
+    return bool(shared_terms)
 
 
 def generic_freelancer_first_opener(first_sentence: str) -> bool:
@@ -1695,7 +1697,7 @@ def normalize_style(value: Any) -> str:
 def style_rules(style: str) -> str:
     if style == "detailed":
         return (
-            "Style: DETAILED. Write 90 to 130 words. Detailed means more depth about the client's situation, "
+            "Style: DETAILED. Write 90 to 150 words. Detailed means more depth about the client's situation, "
             "not more process. Paragraph 1 must have 2 sentences: show why the problem exists, what it is costing "
             "them, or what hidden constraint matters. Paragraph 2 must have 1 to 2 sentences and must use the relevant "
             "past win naturally only if supplied; omit this paragraph entirely when no past win is supplied. Paragraph 3 must "
