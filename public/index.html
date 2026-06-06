@@ -4,10 +4,10 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>ProposalAI | Free Proposal Generator for Freelancers</title>
-  <meta name="description" content="Paste a job post or client brief and get a specific proposal draft to edit. Built for freelancers who need human-sounding proposals without starting from a blank page." />
+  <meta name="description" content="Paste a job post or client brief and get a client-specific freelance proposal draft with scope, proof, constraints, and a practical next step. No signup." />
   <link rel="canonical" href="https://proposalai-xv14.onrender.com/" />
   <meta property="og:title" content="ProposalAI | Free Proposal Generator for Freelancers" />
-  <meta property="og:description" content="Turn rough client notes into a specific proposal draft with opener, scope, proof, and next step." />
+  <meta property="og:description" content="Turn rough client notes into a proposal draft with opener, scope, proof, constraints, and next step." />
   <meta property="og:type" content="website" />
   <meta property="og:url" content="https://proposalai-xv14.onrender.com/" />
   <link rel="icon" href="data:," />
@@ -588,8 +588,8 @@
     <section class="screen" id="profileScreen">
       <div class="setup-layout">
         <div class="intro">
-          <h1>Turn any job post into a proposal you can send.</h1>
-          <p class="intro-copy">Save your freelancer profile once. ProposalAI uses it to draft client-first proposals with your voice and optional proof.</p>
+          <h1>Turn a job post into a real proposal draft.</h1>
+          <p class="intro-copy">Save your freelancer profile once. ProposalAI drafts a client-first proposal that uses the job scope, constraints, proof, and one useful next question.</p>
           <div class="proof-list" aria-label="ProposalAI workflow">
             <div class="proof-item"><span class="proof-dot"></span><span>Profile is saved locally, without an account.</span></div>
             <div class="proof-item"><span class="proof-dot"></span><span>Built for freelance, Upwork, web design, and consulting proposal drafts.</span></div>
@@ -663,7 +663,7 @@
       <div class="workspace-title">
         <div>
           <h1>Draft a proposal</h1>
-          <p>Paste a job description and get a specific first draft in under 30 seconds.</p>
+          <p>Paste a job description and get a specific proposal draft with scope, constraints, proof, and a next question.</p>
         </div>
       </div>
 
@@ -685,14 +685,14 @@
               <legend>Proposal Style: Quick / Detailed</legend>
               <div class="style-options">
                 <label class="style-choice">
-                  <input type="radio" name="proposalStyle" value="quick" checked />
-                  <span class="style-title">Quick</span>
-                  <span class="style-description">50-80 words. Fast and direct.</span>
+                  <input type="radio" name="proposalStyle" value="quick" />
+                  <span class="style-title">Quick opener</span>
+                  <span class="style-description">50-80 words. Fast first reply.</span>
                 </label>
                 <label class="style-choice">
-                  <input type="radio" name="proposalStyle" value="detailed" />
-                  <span class="style-title">Detailed</span>
-                  <span class="style-description">90-130 words. Adds client depth.</span>
+                  <input type="radio" name="proposalStyle" value="detailed" checked />
+                  <span class="style-title">Full proposal</span>
+                  <span class="style-description">90-130 words. Uses scope, constraints, proof, and next step.</span>
                 </label>
               </div>
             </fieldset>
@@ -912,7 +912,7 @@
     }
 
     function selectedStyle() {
-      return document.querySelector('input[name="proposalStyle"]:checked')?.value || "quick";
+      return document.querySelector('input[name="proposalStyle"]:checked')?.value || "detailed";
     }
 
     function sleep(ms) {
@@ -1062,7 +1062,7 @@
         }
         proposalOutput.textContent = proposal;
         proposalOutput.className = "proposal";
-        const styleLabel = selectedStyle() === "detailed" ? "Detailed" : "Quick";
+        const styleLabel = selectedStyle() === "detailed" ? "Full proposal" : "Quick opener";
         const words = data.wordCount || wordCount(proposal);
         outputMeta.textContent = `${styleLabel} - ${words} words. Groq draft. Ready to copy.`;
         copyBtn.classList.remove("hidden");

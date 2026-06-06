@@ -1191,6 +1191,7 @@ def build_prompt(profile: dict[str, Any], job_description: str, relevant_win: st
             "",
             "Situation guidance:",
             guidance,
+            constraint_guidance(job_description),
         ]
     )
 
@@ -1245,6 +1246,7 @@ def build_fallback_prompt(
             "",
             "Situation guidance:",
             guidance,
+            constraint_guidance(job_description),
         ]
     )
 
@@ -1543,6 +1545,33 @@ def numeric_tokens(text: str) -> set[str]:
     return set(re.findall(r"(?<!\w)(?:\$?\d+(?:[.,]\d+)?%?)(?!\w)", text.lower()))
 
 
+def extract_client_constraints(job_description: str) -> list[str]:
+    lowered = job_description.lower()
+    constraints: list[str] = []
+    timeline = re.search(r"\b(?:within\s+)?(\d+[- ]?(?:day|week|month)s?)\b", lowered)
+    if timeline:
+        constraints.append(f"Timeline/deadline mentioned: {timeline.group(1)}")
+    budget = re.search(r"(?:budget\s*(?:is|:)?\s*)?(\$\s?\d[\d,]*(?:\.\d{2})?)", job_description, flags=re.I)
+    if budget:
+        constraints.append(f"Budget mentioned: {budget.group(1).replace(' ', '')}")
+    if "online booking" in lowered or "booking" in lowered:
+        constraints.append("Booking flow is part of the scope")
+    if "seo" in lowered:
+        constraints.append("SEO must be preserved or improved")
+    if "mobile" in lowered or "mobile-friendly" in lowered:
+        constraints.append("Mobile experience matters")
+    if "wordpress" in lowered:
+        constraints.append("WordPress is the platform")
+    return constraints
+
+
+def constraint_guidance(job_description: str) -> str:
+    constraints = extract_client_constraints(job_description)
+    if not constraints:
+        return ""
+    return "Use these job facts if they affect the proposal; do not ignore them or invent replacements: " + "; ".join(constraints) + "."
+
+
 def situation_guidance(job_description: str, style: str) -> str:
     lowered = job_description.lower()
     coupon_zero_checkout = (
@@ -1621,15 +1650,18 @@ def situation_guidance(job_description: str, style: str) -> str:
             "handling already exist."
         )
     if "wordpress" in lowered and ("figma" in lowered or "redesign" in lowered or "revamp" in lowered):
+        has_figma = "figma" in lowered
+        design_source = "Figma design" if has_figma else "redesign"
         if style == "detailed":
             return (
-                "Open with the scope truth: a redesign is not just visuals when Figma, WordPress build, and data migration all sit in the same job. "
-                "Add depth around the risk: page count, current templates, URLs, and existing content decide the timeline more than the word revamp. "
-                "Describe the finished outcome as a Figma design plus WordPress rebuild with existing data migrated cleanly. "
-                "End by asking whether to count every current page on memedownload.in or only the main templates."
+                f"Open with the scope truth: a WordPress {design_source} is not just visuals when existing pages, URLs, content, and any booking/SEO/mobile requirements sit in the same job. "
+                "Add depth around the risk: page count, current templates, integrations, and migration details decide the timeline more than the word redesign. "
+                "If the brief mentions budget, timeline, booking, SEO, or mobile pages, reflect those facts naturally instead of skipping them. "
+                "Describe the finished outcome as a WordPress rebuild that keeps the existing site useful while improving the client-visible experience. "
+                "End by asking whether to count every current page or only the main templates."
             )
         return (
-            "Open with the scope truth: a revamp can look clean in Figma but still fail if WordPress pages, URLs, and existing data are not mapped first. "
+            f"Open with the scope truth: a WordPress {design_source} can look cleaner but still fail if pages, URLs, content, and any booking/SEO/mobile requirements are not mapped first. "
             "Mention checking the current page count before timeline, then ask whether to count every current page or only main templates."
         )
     if ("wordpress" in lowered or "website" in lowered or "pages" in lowered) and (
