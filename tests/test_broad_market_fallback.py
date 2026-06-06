@@ -119,6 +119,19 @@ def test_clean_proposal_repairs_provider_punctuation_after_past_win():
     assert "Could you share" in proposal
 
 
+def test_clean_proposal_removes_common_provider_filler_before_validation():
+    proposal = server.clean_proposal(
+        "A WordPress redesign can look clean but fail if booking and SEO are not mapped. "
+        "The result will be fully functional and connect seamlessly with the current site. "
+        "Should the first pass include every page or only the main templates?"
+    )
+    lowered = proposal.lower()
+
+    assert "seamlessly" not in lowered
+    assert "seamless" not in lowered
+    assert "fully functional" not in lowered
+
+
 def test_provider_failure_returns_visible_groq_error_without_rule_based_fallback(monkeypatch):
     monkeypatch.setattr(server, "github_models_token", lambda: "test-token")
     monkeypatch.setattr(
